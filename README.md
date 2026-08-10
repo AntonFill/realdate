@@ -1,6 +1,6 @@
 # realdate
 
-A cli tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
+A CLI tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
 
 ## Problem
 
@@ -8,38 +8,61 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 
 ## Features
 
-- **Extract dates** from filename prefix (flexible format: `yyyy.MM.dd.HH.mm`, `yyyy.MM.dd`, `yyyy-MM-dd`, `yyyyy_MM_dd`)
-- **Parse optional time** (format: `dd.MM.yyyy` scanning for human-readable dates, etc.)
+- **Extract dates** from filename prefix (flexible format: `yyyy.MM.dd.HH.mm`, `yyyy.MM.dd`, `yyyy-MM-dd`, `yyyy_MM_dd`)
+- **Parse optional time** from the prefix (`2026.06.07.14.30` sets 14:30, a date without time falls back to 00:00)
 - **Set macOS timestamps** (both creation and modification dates)
 - **Clean filenames** by removing the date prefix
 - **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
 - **Recursive processing** with `-r` flag
 - **Verbose mode** with `-v` flag for detailed output
-- **Skip files** without leading dates; hidden files and folders; already are of same creation date (safe to run on mixed directories)
+- **Skip files** without a leading date, plus hidden files and folders (safe to run on mixed directories)
+
+## Installation
+
+```bash
+brew install antonfill/tap/realdate
+```
+
+The formula builds from source, so Xcode 26.4 or newer has to be installed.
+
+### From source
+
+```bash
+make build       # release build
+make install     # installs to /usr/local/bin
+swift test       # run the test suite
+```
+
+### Uninstallation
+
+```bash
+brew uninstall realdate     # installed via Homebrew
+make uninstall              # installed from source
+```
 
 ## Usage
 
 ```bash
 # Process single file assigning scanned leading date from filename into the file's metadata attributes
-./realdate "2026.06.07 MyDocument.pdf"
+realdate "2026.06.07 MyDocument.pdf"
 
 # Process directory
-./realdate ~/Documents
+realdate ~/Documents
 
 # Process recursively
-./realdate -r ~/Paperless
+realdate -r ~/Paperless
 
 # Process assigning date into attributes and renaming/removing leading dates in filename
-./realdate --rename ~/Paperless
+realdate --rename ~/Paperless
 
 # Process with custom date format for scanning filename prefix different from listing above
-./realdate --format "dd.MM.yyyy" ~/Paperless
+realdate --format "dd.MM.yyyy" ~/Paperless
 
 # Verbose output
-./realdate -v -r .
+realdate -v -r .
 
 # Show help
-./realdate --help
+realdate --help
 ```
 
 ## Filename Format
@@ -53,6 +76,8 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 - **Time format:** `2026.06.07.14.30 Email.eml` → `Email.eml` (time: 14:30)
 - Time is optional; if missing, defaults to 00:00
 
+Since v1.1.0 the filename is the single source of truth and timestamps are synchronised to the minute. Earlier versions compared the existing timestamp first and skipped a file whose date already matched, which left the time wrong.
+
 ### Edge Cases
 - **Multiple spaces:** `2026.06.07 My Important Doc.pdf` → `My Important Doc.pdf`
 - **No date:** `MyDocument.pdf` → skipped silently (or with message in verbose mode)
@@ -61,55 +86,27 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 
 ## Options
 ```bash
-OPTIONS:
-  --format <format>      The date format (e.g. dd-MM-yyyy). (default: yyyy.MM.dd.HH.mm and yyyy.MM.dd)
-  -r, --recursive        Search recursively in subdirectories.
-  --rename               Set timestamps, but do not modify filenames.
-  -v, --verbose          Show detailed information.
-  --version              Show the version.
-  -h, --help             Show help information.
-
 ARGUMENTS:
-  <path>                 The path to the file(s) or directory.
+  <path>                  Path to file(s) or directory.
+
+OPTIONS:
+  --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
+                          yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
+                          yyyy.MM.dd)
+  -r, --recursive         Search recursively in subdirectories.
+  -v, --verbose           Show detailed information.
+  --rename                Set timestamps, and rename files.
+  --version               Show the version.
+  -h, --help              Show help information.
 ```
 
-## Building
+## Development
 
 ```bash
-swift build -c release
-# Binary: .build/release/realdate
+swift build -c release   # binary: .build/release/realdate
+swift test               # run the test suite
+make clean               # clean build artifacts
 ```
-
-## Local Development
-```bash
-make build               # Build only
-make install             # Build + install to /usr/local/bin/
-make uninstall           # Remove from /usr/local/bin/
-make clean               # Clean build artifacts
-```
-
-## Testing
-
-```bash
-swift test
-```
-
-## Installation
-
-### Via Homebrew (Recommended)
-```bash
-brew tap AntonFill/tap
-brew install realdate
-```
-
-## Uninstallation
-
-### Via Homebrew (Recommended)
-```bash
-brew uninstall realdate
-brew untap AntonFill/tap
-```
-
 
 ## Use Cases
 - **Paperless Office**: Organize scanned documents by their archive date, not scan date.
@@ -126,6 +123,6 @@ brew untap AntonFill/tap
 
 ## Compatibility
 
-- macOS 13+
-- Swift 6.0+
+- Runs on macOS 13+
+- Builds with Swift 6.3 (Xcode 26.4)
 - Requires file system write permissions
