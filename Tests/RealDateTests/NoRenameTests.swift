@@ -22,13 +22,10 @@ struct NoRenameTests {
         let oldTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
         let newTestURL = tempDir.appendingPathComponent("TestDocument.txt")
         try "Test content".write(to: oldTestURL, atomically: true, encoding: .utf8)
-        
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = false
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+
+        let modifiedBefore = try #require( FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))[.modificationDate] as? Date )
+
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false))
         try realDate.run()
 
         #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)))
@@ -38,6 +35,8 @@ struct NoRenameTests {
         let date = try #require( realDate.parseDateFromFilename(oldTestURL.lastPathComponent, dateFormatters: formatters)?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false)) // There is no newTestURL
         #expect(attributes[.creationDate] as? Date == date)
-        #expect(attributes[.modificationDate] as? Date == date)
+        // The file was written just now, so its modification date is newer than the date in
+        // its name and has to survive untouched.
+        #expect(attributes[.modificationDate] as? Date == modifiedBefore)
     }
 }

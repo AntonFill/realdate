@@ -10,12 +10,14 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 
 - **Extract dates** from filename prefix (flexible format: `yyyy.MM.dd.HH.mm`, `yyyy.MM.dd`, `yyyy-MM-dd`, `yyyy_MM_dd`)
 - **Parse optional time** from the prefix (`2026.06.07.14.30` sets 14:30, a date without time falls back to 00:00)
-- **Set macOS timestamps** (both creation and modification dates)
+- **Set macOS timestamps**: the creation date comes from the filename, the modification date is only lifted, never pulled back
 - **Clean filenames** by removing the date prefix
 - **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
 - **Recursive processing** with `-r` flag
+- **Directories as items** with `-d` flag, so `2026.06.07 Holiday/` can be dated and renamed too
 - **Verbose mode** with `-v` flag for detailed output
 - **Skip files** without a leading date, plus hidden files and folders (safe to run on mixed directories)
+- **Never follow symbolic links**, so nothing is written outside the given path
 
 ## Installation
 
@@ -58,6 +60,9 @@ realdate --rename ~/Paperless
 # Process with custom date format for scanning filename prefix different from listing above
 realdate --format "dd.MM.yyyy" ~/Paperless
 
+# Process directories themselves as well, not just the files inside them
+realdate -r -d --rename ~/Paperless
+
 # Verbose output
 realdate -v -r .
 
@@ -84,7 +89,30 @@ Since v1.1.0 the filename is the single source of truth and timestamps are synch
 - **Trailing dates:** `2026.06.07 Document 2025.05.10.pdf` → `Document 2025.05.10.pdf` (only first date processed)
 - **Duplicates:** Automatic counter added (`Document.txt`, `Document 2.txt`, etc.)
 
+## Timestamps
+
+The creation date always becomes the date read from the name. The modification date is treated differently: it is only lifted when the name is *newer* than it, and left alone otherwise.
+
+The reason is that the two dates answer different questions. The name says when a document is *from*, the modification date says when the file was last *edited*, and an edit that happened after the document's date is a fact worth keeping. Only when the name is newer would the file end up modified before it was created, and that inconsistency is corrected by lifting.
+
+Since v1.2.0, before that both dates were set to the same value.
+
+## Directories
+
+Without `-d`, directories are only traversed, never touched, and their own date prefix stays in place. With `-d` a directory is treated like any other item: its timestamps are set, and with `--rename` the prefix is stripped from its name. It applies to the directory given on the command line, and with `-r` to every subdirectory visited.
+
+A directory is always processed after its contents. Every write inside a directory bumps its modification date, so doing it the other way round would undo the work immediately.
+
+## Symbolic Links
+
+Symbolic links are skipped, wherever they turn up: inside a processed directory, and as the path given on the command line. They are never followed.
+
+Following them meant writing outside the path the user actually named, because the timestamp would land on the link's target. In a recursive run a link pointing back up also sent the traversal around the same cycle until the path length ran out, and it processed unrelated directories along the way. Both were fixed in v1.2.0.
+
 ## Options
+
+Copied from `realdate --help`, which is the authority. If the two ever disagree, the help is right.
+
 ```bash
 ARGUMENTS:
   <path>                  Path to file(s) or directory.
@@ -96,6 +124,10 @@ OPTIONS:
   -r, --recursive         Search recursively in subdirectories.
   -v, --verbose           Show detailed information.
   --rename                Set timestamps, and rename files.
+  -d, --directories       Treat a directory itself as an item: set its
+                          timestamps, and rename it with --rename. Applies to
+                          the given directory, and to every visited
+                          subdirectory with -r.
   --version               Show the version.
   -h, --help              Show help information.
 ```

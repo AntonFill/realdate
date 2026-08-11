@@ -22,13 +22,10 @@ struct FileOperationsTests {
         let curTestURL = tempDir.appendingPathComponent("2026.06.07 TestDocument.txt")
         let newTestURL = tempDir.appendingPathComponent("TestDocument.txt")
         try "Test content".write(to: curTestURL, atomically: true, encoding: .utf8)
-        
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = curTestURL.path(percentEncoded: false)
+
+        let modifiedBefore = try #require( FileManager.default.attributesOfItem(atPath: curTestURL.path(percentEncoded: false))[.modificationDate] as? Date )
+
+        var realDate = makeRealDate(path: curTestURL.path(percentEncoded: false), rename: true)
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: curTestURL.path(percentEncoded: false)) == false)
@@ -38,9 +35,11 @@ struct FileOperationsTests {
         let date = try #require( realDate.parseDateFromFilename(curTestURL.lastPathComponent, dateFormatters: formatters)?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
-        #expect(attributes[.modificationDate] as? Date == date)
+        // The file was written just now, so its modification date is newer than the date in
+        // its name and has to survive untouched.
+        #expect(attributes[.modificationDate] as? Date == modifiedBefore)
     }
-    
+
     @Test("Skip file with no date")
     func skipFileWithNoDate() throws {
         let tempDir = try createTestDirectory()
@@ -55,12 +54,7 @@ struct FileOperationsTests {
         let oldCreatedDate = try #require( oldAttributes[.creationDate] as? Date )
         let oldModifiedDate = try #require( oldAttributes[.modificationDate] as? Date )
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = oldTestURL.path(percentEncoded: false)
+        var realDate = makeRealDate(path: oldTestURL.path(percentEncoded: false), rename: true)
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)))
@@ -80,14 +74,9 @@ struct FileOperationsTests {
         let testDir = tempDir.appendingPathComponent("2026.06.07 TestDir")
         try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: true)
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = testDir.path(percentEncoded: false)
+        var realDate = makeRealDate(path: testDir.path(percentEncoded: false), rename: true)
         try realDate.run()
-        
+
         #expect(FileManager.default.fileExists(atPath: testDir.path(percentEncoded: false)))
     }
 
@@ -111,12 +100,7 @@ struct FileOperationsTests {
         let newTest3URL = tempDir.appendingPathComponent("Document 3.txt")
         try "Content 3".write(to: oldTest3URL, atomically: true, encoding: .utf8)
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false), rename: true)
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)) == false)
@@ -140,12 +124,9 @@ struct FileOperationsTests {
         let newTestURL = tempDir.appendingPathComponent("Email.eml")
         try "Email content".write(to: oldTestURL, atomically: true, encoding: .utf8)
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+        let modifiedBefore = try #require( FileManager.default.attributesOfItem(atPath: oldTestURL.path(percentEncoded: false))[.modificationDate] as? Date )
+
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false), rename: true)
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: oldTestURL.path(percentEncoded: false)) == false)
@@ -155,6 +136,8 @@ struct FileOperationsTests {
         let date = try #require( realDate.parseDateFromFilename(oldTestURL.lastPathComponent, dateFormatters: formatters)?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTestURL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
-        #expect(attributes[.modificationDate] as? Date == date)
+        // The file was written just now, so its modification date is newer than the date in
+        // its name and has to survive untouched.
+        #expect(attributes[.modificationDate] as? Date == modifiedBefore)
     }
 }

@@ -27,12 +27,7 @@ struct HiddenFilesTests {
         let newNormalURL = tempDir.appendingPathComponent("NormalDocument.txt")
         try "Normal content".write(to: oldNormalURL, atomically: true, encoding: .utf8)
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false), rename: true)
         try realDate.run()
         
         // Hidden file should still exist with original name
@@ -57,12 +52,7 @@ struct HiddenFilesTests {
         let testFileURL = hiddenDirURL.appendingPathComponent("2026.06.07 TestInHiddenDir.txt")
         try "Content".write(to: testFileURL, atomically: true, encoding: .utf8)
 
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = true
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false), recursive: true, rename: true)
         try realDate.run()
 
         #expect(FileManager.default.fileExists(atPath: testFileURL.path(percentEncoded: false)))

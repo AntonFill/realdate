@@ -27,13 +27,10 @@ struct CustomFormatTests {
         let newTest2URL = tempDir.appendingPathComponent("TestImage.txt")
         try "Test image".write(to: oldTest2URL, atomically: true, encoding: .utf8)
 
-        var realDate = RealDate()
         let dateFormat = "dd.MM.yyyy"
-        realDate.format = [dateFormat]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = tempDir.path(percentEncoded: false)
+        let modifiedBefore = try #require( FileManager.default.attributesOfItem(atPath: oldTest2URL.path(percentEncoded: false))[.modificationDate] as? Date )
+
+        var realDate = makeRealDate(path: tempDir.path(percentEncoded: false), format: [dateFormat], rename: true)
         try realDate.run()
         
         #expect(FileManager.default.fileExists(atPath: oldTest1URL.path(percentEncoded: false)))
@@ -46,6 +43,8 @@ struct CustomFormatTests {
         let date = try #require( realDate.parseDateFromFilename(oldTest2URL.lastPathComponent, dateFormatters: [formatter])?.date )
         let attributes = try FileManager.default.attributesOfItem(atPath: newTest2URL.path(percentEncoded: false))
         #expect(attributes[.creationDate] as? Date == date)
-        #expect(attributes[.modificationDate] as? Date == date)
+        // The file was written just now, so its modification date is newer than the date in
+        // its name and has to survive untouched.
+        #expect(attributes[.modificationDate] as? Date == modifiedBefore)
     }
 }

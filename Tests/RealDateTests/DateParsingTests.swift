@@ -12,15 +12,7 @@ import Foundation
 @Suite("Date Parsing")
 struct DateParsingTests {
     let calendar = Calendar.current
-    var realDate = {
-        var realDate = RealDate()
-        realDate.format = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
-        realDate.recursive = false
-        realDate.rename = true
-        realDate.verbose = false
-        realDate.path = ""
-        return realDate
-    }()
+    var realDate = makeRealDate(path: "", rename: true)
     let formatters = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"].map { $0.customDateFormatter() }
     
     @Test("Parse valid date with dots")

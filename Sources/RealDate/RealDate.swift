@@ -12,7 +12,7 @@ import ArgumentParser
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
     static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
-    static let version = "1.1.0"
+    static let version = "1.2.0"
 
     static let configuration = CommandConfiguration(
         commandName: Self.appname,
@@ -32,14 +32,24 @@ struct RealDate: ParsableCommand {
     @Flag(name: .long, help: "Set timestamps, and rename files.")
     var rename = false
 
+    @Flag(name: .shortAndLong, help: "Treat a directory itself as an item: set its timestamps, and rename it with --rename. Applies to the given directory, and to every visited subdirectory with -r.")
+    var directories = false
+
     @Argument(help: "Path to file(s) or directory.")
     var path: String
-    
+
     mutating func run() throws {
         let dateFormatters = self.format.map { $0.customDateFormatter() }
-        
+
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
+
+        // Checked before existence: a dangling link exists as a link, and reporting it
+        // as a missing file would hide what it actually is.
+        if fileManager.isSymbolicLink(atPath: self.path) {
+            print("realdate: \(self.path): Skipping symbolic link")
+            return
+        }
 
         guard fileManager.fileExists(atPath: self.path, isDirectory: &isDir) else {
             print("realdate: \(self.path): No such file or directory")
@@ -83,6 +93,15 @@ extension RealDate {
                 }
 
                 let fullPath = (dirPath as NSString).appendingPathComponent(item)
+
+                // Symbolic links are never followed: the timestamps would land on the link's
+                // target, outside the given path, and a link cycle would recurse until the
+                // path length runs out.
+                if fileManager.isSymbolicLink(atPath: fullPath) {
+                    printIf(self.verbose, "realdate: \(item): Skipping symbolic link")
+                    continue
+                }
+
                 var isDir: ObjCBool = false
 
                 guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) else {
@@ -101,66 +120,83 @@ extension RealDate {
                     self.processFile(fullPath, dateFormatters: dateFormatters)
                 }
             }
+
+            // The directory itself comes last: dating or renaming it before its contents
+            // would be undone by every write inside it.
+            if self.directories {
+                self.applyDate(toItemAtPath: dirPath, dateFormatters: dateFormatters)
+            }
         }
         catch {
             print("realdate: \(dirPath): \(error.localizedDescription)")
         }
     }
-    
+
     func processFile(_ filePath: String, dateFormatters: [DateFormatter]) {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
 
         guard fileManager.fileExists(atPath: filePath, isDirectory: &isDir) else {
-            printIf(verbose, "realdate: \(filePath): No such file or directory")
+            printIf(self.verbose, "realdate: \(filePath): No such file or directory")
             return
         }
 
         // Skip directories
         if isDir.boolValue {
-            printIf(verbose, "realdate: \(filePath): Expecting file, but is a directory. skipping")
+            printIf(self.verbose, "realdate: \(filePath): Expecting file, but is a directory. skipping")
             return
         }
 
-        let filename = URL(fileURLWithPath: filePath).lastPathComponent
+        self.applyDate(toItemAtPath: filePath, dateFormatters: dateFormatters)
+    }
 
-        guard let tuple = self.parseDateFromFilename(filename, dateFormatters: dateFormatters) else {
-            printIf(verbose, "realdate: \(filename): No date prefix found, skipping")
+    /// Sets the timestamps from the date in the item's name and, with `--rename`, strips the
+    /// date prefix from it. Works for files and directories alike.
+    func applyDate(toItemAtPath itemPath: String, dateFormatters: [DateFormatter]) {
+        let fileManager = FileManager.default
+        let itemName = URL(fileURLWithPath: itemPath).lastPathComponent
+
+        guard let tuple = self.parseDateFromFilename(itemName, dateFormatters: dateFormatters) else {
+            printIf(self.verbose, "realdate: \(itemName): No date prefix found, skipping")
             return
         }
 
         do {
-            let attributes: [FileAttributeKey: Any] = [
-                .creationDate: tuple.date,
-                .modificationDate: tuple.date
-            ]
-            try fileManager.setAttributes(attributes, ofItemAtPath: filePath)
-            
+            var attributes: [FileAttributeKey: Any] = [.creationDate: tuple.date]
+
+            // The modification date is only lifted, never pulled back: an item edited after
+            // the date in its name keeps the record of that edit.
+            let currentAttributes = try fileManager.attributesOfItem(atPath: itemPath)
+            if let modified = currentAttributes[.modificationDate] as? Date, modified < tuple.date {
+                attributes[.modificationDate] = tuple.date
+            }
+            try fileManager.setAttributes(attributes, ofItemAtPath: itemPath)
+
             let dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
             guard self.rename else {
-                printIf(verbose, "realdate: \(filename): Date set to \(dateString) (filename unchanged)")
+                printIf(self.verbose, "realdate: \(itemName): Date set to \(dateString) (filename unchanged)")
                 return
             }
-            
-            // Rename file and set timestamps
-            let directory = URL(fileURLWithPath: filePath).deletingLastPathComponent().path
+
+            // Rename item and set timestamps
+            let directory = URL(fileURLWithPath: itemPath).deletingLastPathComponent().path
             var newPath = (directory as NSString).appendingPathComponent(tuple.name)
 
             // Handle duplicates
-            if fileManager.fileExists(atPath: newPath) && newPath != filePath {
+            if fileManager.fileExists(atPath: newPath) && newPath != itemPath {
                 newPath = self.findAvailablePath(newPath)
-                let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-                printIf(verbose, "realdate: \(filename): Duplicate found, renamed to \(newFilename)")
+                let newName = URL(fileURLWithPath: newPath).lastPathComponent
+                printIf(self.verbose, "realdate: \(itemName): Duplicate found, renamed to \(newName)")
             }
 
-            // Rename file
-            try fileManager.moveItem(atPath: filePath, toPath: newPath)
+            // Rename item
+            try fileManager.moveItem(atPath: itemPath, toPath: newPath)
 
-            let newFilename = URL(fileURLWithPath: newPath).lastPathComponent
-            printIf(verbose, "realdate: \(filename): Renamed to \(newFilename): Date set to \(dateString)")
+            let newName = URL(fileURLWithPath: newPath).lastPathComponent
+            printIf(self.verbose, "realdate: \(itemName): Renamed to \(newName): Date set to \(dateString)")
         }
         catch {
-            print("realdate: \(filename): \(error.localizedDescription)")
+            print("realdate: \(itemName): \(error.localizedDescription)")
         }
     }
     
@@ -221,6 +257,16 @@ func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
 }
 
 // MARK: - extensions
+extension FileManager {
+
+    /// `attributesOfItem` reports the link itself instead of its target, so a symbolic link
+    /// can be told apart before anything follows it.
+    func isSymbolicLink(atPath path: String) -> Bool {
+        let attributes = try? self.attributesOfItem(atPath: path)
+        return attributes?[.type] as? FileAttributeType == .typeSymbolicLink
+    }
+}
+
 extension DateFormatter {
     
     static var mediumDateShortTime: DateFormatter {
