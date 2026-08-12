@@ -9,8 +9,8 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 ## Features
 
 - **Extract dates** from filename prefix (flexible format: `yyyy.MM.dd.HH.mm`, `yyyy.MM.dd`, `yyyy-MM-dd`, `yyyy_MM_dd`)
-- **Parse optional time** from the prefix (`2026.06.07.14.30` sets 14:30, a date without time falls back to 00:00)
-- **Set macOS timestamps**: the creation date comes from the filename, the modification date is only lifted, never pulled back
+- **Parse optional time** from the prefix (`2026.06.07.14.30` sets 14:30, a date without time means 00:00)
+- **Set macOS timestamps** by one rule: a coarser statement never replaces a finer one. Midnight from a date-only name does not overwrite a real time on that same day, and the modification date is only lifted, never pulled back
 - **Clean filenames** by removing the date prefix
 - **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
 - **Recursive processing** with `-r` flag
@@ -88,14 +88,17 @@ Since v1.1.0 the filename is the single source of truth and timestamps are synch
 - **No date:** `MyDocument.pdf` → skipped silently (or with message in verbose mode)
 - **Trailing dates:** `2026.06.07 Document 2025.05.10.pdf` → `Document 2025.05.10.pdf` (only first date processed)
 - **Duplicates:** Automatic counter added (`Document.txt`, `Document 2.txt`, etc.)
+- **Already on that day:** `2026.06.07 Doc.pdf`, created on 2026-06-07 at 12:15, keeps its 12:15 and is still renamed to `Doc.pdf`
 
 ## Timestamps
 
-The creation date always becomes the date read from the name. The modification date is treated differently: it is only lifted when the name is *newer* than it, and left alone otherwise.
+Both timestamps follow one rule: **a coarser statement never replaces a finer one.**
 
-The reason is that the two dates answer different questions. The name says when a document is *from*, the modification date says when the file was last *edited*, and an edit that happened after the document's date is a fact worth keeping. Only when the name is newer would the file end up modified before it was created, and that inconsistency is corrected by lifting.
+The creation date comes from the name, with one exception. A date-only format parses to midnight, and that midnight is a product of the format rather than a measurement, so it never replaces a real clock time the file already carries on that same day. `2026.08.12 Notes.md`, created at 12:15 on that very day, keeps its 12:15. A name that states a time of its own, such as `2026.08.12.09.30 Notes.md`, always wins, because it *is* a measurement. The rename happens either way, only the timestamp is spared.
 
-Since v1.2.0, before that both dates were set to the same value.
+The modification date is only lifted when the name is *newer* than it, and left alone otherwise. The name says when a document is *from*, the modification date says when the file was last *edited*, and an edit that happened after the document's date is a fact worth keeping. Only when the name is newer would the file end up modified before it was created, and that inconsistency is corrected by lifting.
+
+Both behaviors arrived in v1.2.0. Before that, both dates were set from the name unconditionally.
 
 ## Directories
 
