@@ -25,7 +25,7 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 brew install antonfill/tap/realdate
 ```
 
-The formula builds from source, so Xcode 26.4 or newer has to be installed.
+The formula builds from source, so Xcode 16 or newer has to be installed.
 
 ### From source
 
@@ -156,5 +156,5 @@ make clean               # clean build artifacts
 ## Compatibility
 
 - Runs on macOS 13+
-- Builds with Swift 6.3 (Xcode 26.4)
+- Requires Swift 6.0 or newer (Xcode 16+), built and tested against Swift 6.3
 - Requires file system write permissions
