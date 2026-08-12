@@ -5,8 +5,20 @@
 //  Created by Anton Fillmann on 10.06.2026.
 //
 
+import Testing
 import Foundation
 @testable import realdate
+
+/// Builds a local-time date, so tests can state a wall clock time instead of an interval.
+func makeDate(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, minute: Int = 0) throws -> Date {
+    var components = DateComponents()
+    components.year = year
+    components.month = month
+    components.day = day
+    components.hour = hour
+    components.minute = minute
+    return try #require(Calendar.current.date(from: components))
+}
 
 func createTestDirectory(_ fileID: String = #fileID) throws -> URL {
     let fileID = fileID.replacingOccurrences(of: "/", with: "_")

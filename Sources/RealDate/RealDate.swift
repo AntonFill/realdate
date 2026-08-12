@@ -70,6 +70,8 @@ extension RealDate {
     struct DateFilenameTuple {
         let date: Date
         let name: String
+        /// Whether the matched format carried a time of day rather than a bare date.
+        let hasTime: Bool
     }
 }
 
@@ -162,19 +164,34 @@ extension RealDate {
         }
 
         do {
-            var attributes: [FileAttributeKey: Any] = [.creationDate: tuple.date]
+            let currentAttributes = try fileManager.attributesOfItem(atPath: itemPath)
+            var attributes: [FileAttributeKey: Any] = [:]
+
+            let keptTime = self.existingTimeToKeep(for: tuple, attributes: currentAttributes)
+            if keptTime == nil {
+                attributes[.creationDate] = tuple.date
+            }
 
             // The modification date is only lifted, never pulled back: an item edited after
             // the date in its name keeps the record of that edit.
-            let currentAttributes = try fileManager.attributesOfItem(atPath: itemPath)
             if let modified = currentAttributes[.modificationDate] as? Date, modified < tuple.date {
                 attributes[.modificationDate] = tuple.date
             }
-            try fileManager.setAttributes(attributes, ofItemAtPath: itemPath)
 
-            let dateString = DateFormatter.mediumDateShortTime.string(from: tuple.date)
+            if attributes.isEmpty == false {
+                try fileManager.setAttributes(attributes, ofItemAtPath: itemPath)
+            }
+
+            let dateString: String
+            if let keptTime {
+                dateString = "already on \(DateFormatter.mediumDateShortTime.string(from: keptTime)), time kept"
+            }
+            else {
+                dateString = "set to \(DateFormatter.mediumDateShortTime.string(from: tuple.date))"
+            }
+
             guard self.rename else {
-                printIf(self.verbose, "realdate: \(itemName): Date set to \(dateString) (filename unchanged)")
+                printIf(self.verbose, "realdate: \(itemName): Date \(dateString) (filename unchanged)")
                 return
             }
 
@@ -193,13 +210,31 @@ extension RealDate {
             try fileManager.moveItem(atPath: itemPath, toPath: newPath)
 
             let newName = URL(fileURLWithPath: newPath).lastPathComponent
-            printIf(self.verbose, "realdate: \(itemName): Renamed to \(newName): Date set to \(dateString)")
+            printIf(self.verbose, "realdate: \(itemName): Renamed to \(newName): Date \(dateString)")
         }
         catch {
             print("realdate: \(itemName): \(error.localizedDescription)")
         }
     }
-    
+
+    /// Returns the creation time that has to survive, if any.
+    ///
+    /// A date-only format always parses to midnight. That midnight is a product of the format,
+    /// not a measurement, so it never replaces a real clock time that already sits on the same
+    /// day. Renaming happens either way, only the timestamp is spared.
+    func existingTimeToKeep(for tuple: DateFilenameTuple, attributes: [FileAttributeKey: Any]) -> Date? {
+        guard tuple.hasTime == false else {
+            return nil
+        }
+        guard let created = attributes[.creationDate] as? Date else {
+            return nil
+        }
+        guard created.isSameDay(as: tuple.date) else {
+            return nil
+        }
+        return created
+    }
+
     func parseDateFromFilename(_ filename: String, dateFormatters: [DateFormatter]) -> DateFilenameTuple? {
         for formatter in dateFormatters {
             guard let date = formatter.date(fromFilename: filename) else {
@@ -216,7 +251,7 @@ extension RealDate {
                 return nil // if no name left, to much trimmed away. Cancels for this filename.
             }
             
-            return DateFilenameTuple(date: date, name: String(realFilename))
+            return DateFilenameTuple(date: date, name: String(realFilename), hasTime: formatter.hasTimeComponent)
         }
         return nil
     }
@@ -241,7 +276,7 @@ extension RealDate {
                 "\(baseName) \(counter).\(fileExtension)"
             let newPath = (dirPath as NSString).appendingPathComponent(newFilename)
 
-            if !fileManager.fileExists(atPath: newPath) {
+            if fileManager.fileExists(atPath: newPath) == false {
                 return newPath
             }
             counter += 1
@@ -277,6 +312,15 @@ extension DateFormatter {
         return formatter
     }
     
+    /// Whether the format carries a time of day. A date-only format parses to midnight, which
+    /// says nothing about the actual time an item was created.
+    var hasTimeComponent: Bool {
+        let timeSymbols = CharacterSet(charactersIn: "HhKkmsSa")
+        return self.dateFormat.unicodeScalars.contains { scalar in
+            timeSymbols.contains(scalar)
+        }
+    }
+
     func date(fromFilename filename: String) -> Date? {
         let dateLength = self.dateFormat.count
         let separators = CharacterSet(charactersIn: "-_: ")
