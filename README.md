@@ -112,6 +112,20 @@ Symbolic links are skipped, wherever they turn up: inside a processed directory,
 
 Following them meant writing outside the path the user actually named, because the timestamp would land on the link's target. In a recursive run a link pointing back up also sent the traversal around the same cycle until the path length ran out, and it processed unrelated directories along the way. Both were fixed in v1.2.0.
 
+## Exit Codes and Streams
+
+Safe to use in a script: a failure is reported on stderr and answered with a non-zero exit code.
+
+| Code | Meaning |
+|---|---|
+| `0` | Everything the tool was asked to do succeeded. Items it deliberately skipped, such as symbolic links or names without a date, do not change this. |
+| `1` | At least one item could not be processed, for example an unreadable directory or a rename that was denied. A run over a tree still processes the remaining items and reports the failure at the end, like `chmod -R`. |
+| `64` | The command line itself was wrong: a missing path, an unknown option, or an empty `--format`. |
+
+Failures go to **stderr**. Everything else, including the `-v` log of what was renamed and dated, goes to **stdout**, the way `cp -v` does. So `realdate -v -r … 2>/dev/null` shows the log and hides only the errors.
+
+Before v1.2.1 every failure was printed to stdout with exit code 0.
+
 ## Options
 
 Copied from `realdate --help`, which is the authority. If the two ever disagree, the help is right.

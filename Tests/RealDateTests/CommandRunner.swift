@@ -210,6 +210,15 @@ extension CommandRunner {
         return try FileManager.default.contentsOfDirectory(atPath: self.workspace.path).sorted()
     }
 
+    /// Sets POSIX permissions, for the tests that need the command to fail on a real
+    /// permission error rather than on a simulated one.
+    ///
+    /// A test that takes permissions away has to give them back before the workspace is
+    /// removed, otherwise the cleanup cannot list the directory it is deleting.
+    func setPermissions(of name: String, _ permissions: Int) throws {
+        try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: self.path(name).path)
+    }
+
     /// Drops the whole workspace and its stream files. Called from a `defer` in
     /// every test.
     func removeWorkspace() {

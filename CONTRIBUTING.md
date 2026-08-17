@@ -73,6 +73,20 @@ Most suites run **in process**: they build the command with `makeRealDate(…)` 
 - Detail goes through `printIf(self.verbose, …)`. Anything the user did not ask for stays behind `-v`.
 - A skip says **what** was skipped and why: a dangling link is reported as a link, not as a missing file, which is why the symlink check runs before the existence check.
 
+Unix means the stream and the exit code too, not just the shape of the line. Until 1.2.1 every failure went to stdout with exit 0, so `realdate … || echo failed` could never fire. The split now:
+
+| | Stream | Exit code | Examples |
+|---|---|---|---|
+| **Failure** | stderr, unconditional | non-zero | path does not exist, directory cannot be read, rename denied |
+| **Skip** | stdout, mostly behind `-v` | 0 | symbolic link, no date prefix, hidden item, subdirectory without `-r` |
+| **Detail** | stdout, behind `-v` | 0 | what was renamed, which timestamp was set or kept |
+
+- **A skip is not a failure.** The tool decided not to touch something and says so; `find` and `cp` exit 0 in the same situation. Only a request the tool could not carry out is a failure.
+- **Diagnostics stay on stdout, unlike in the sibling mail2md**, which puts everything on stderr. This tool produces no data on stdout, so `-v` output can live there the way `cp -v` and `mv -v` do, and `2>/dev/null` then silences errors only.
+- **A tree run does not stop at the first failure.** It sets `self.hadFailure` and carries on, and `run()` throws `ExitCode.failure` at the end, the way `chmod -R` behaves. That is why `processDirectory`, `processFile` and `applyDate` are `mutating`.
+- **Never let Foundation's own error text be the whole message.** It names the item in typographic quotes, it is localized, and it carries no path in this tool's shape. Write the tool's line unconditionally and put `error.localizedDescription` behind `-v`.
+- **Reject bad input in `validate()`**, not inside `run()`. ArgumentParser then produces the usage error itself: stderr, exit 64, and the usage block. `--format ""` is the case that exists, and it earned the rule.
+
 ## Layout and style
 
 The style was set by hand across the sources and is the reference. **When in doubt, copy the shape of the surrounding code.** Please do not run a formatter over this repo.

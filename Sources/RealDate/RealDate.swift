@@ -38,6 +38,14 @@ struct RealDate: ParsableCommand {
     @Argument(help: "Path to file(s) or directory.")
     var path: String
 
+    /// Whether anything failed along the way.
+    ///
+    /// A run over a tree does not stop at the first unreadable item, the same way
+    /// `chmod -R` does not: the remaining items are still processed, and the failure
+    /// surfaces once at the end as a non-zero exit code. Not an option or a flag, so
+    /// ArgumentParser leaves it alone.
+    var hadFailure = false
+
     /// Rejects a format that cannot describe a date.
     ///
     /// The empty format is the one that does damage, and it arrives by accident rather
@@ -66,14 +74,18 @@ struct RealDate: ParsableCommand {
         }
 
         guard fileManager.fileExists(atPath: self.path, isDirectory: &isDir) else {
-            print("realdate: \(self.path): No such file or directory")
-            return
+            printIf(true, "realdate: \(self.path): No such file or directory", to: .standardError)
+            throw ExitCode.failure
         }
 
         if isDir.boolValue {
             self.processDirectory(self.path, dateFormatters: dateFormatters)
         } else {
             self.processFile(self.path, dateFormatters: dateFormatters)
+        }
+
+        if self.hadFailure {
+            throw ExitCode.failure
         }
     }
 }
@@ -91,7 +103,7 @@ extension RealDate {
 
 extension RealDate {
     
-    func processDirectory(_ dirPath: String, dateFormatters: [DateFormatter]) {
+    mutating func processDirectory(_ dirPath: String, dateFormatters: [DateFormatter]) {
         printIf(self.verbose, "realdate: Processing directory: \(dirPath)")
 
         do {
@@ -144,11 +156,16 @@ extension RealDate {
             }
         }
         catch {
-            print("realdate: \(dirPath): \(error.localizedDescription)")
+            // Foundation's own text is unusable as CLI output: it names the item in
+            // typographic quotes, it is localized, and it does not carry the path in this
+            // tool's shape. So the reason stays behind -v and the line above it does not.
+            printIf(true, "realdate: \(dirPath): cannot be read", to: .standardError)
+            printIf(self.verbose, "realdate: \(dirPath): \(error.localizedDescription)", to: .standardError)
+            self.hadFailure = true
         }
     }
 
-    func processFile(_ filePath: String, dateFormatters: [DateFormatter]) {
+    mutating func processFile(_ filePath: String, dateFormatters: [DateFormatter]) {
         let fileManager = FileManager.default
         var isDir: ObjCBool = false
 
@@ -168,7 +185,7 @@ extension RealDate {
 
     /// Sets the timestamps from the date in the item's name and, with `--rename`, strips the
     /// date prefix from it. Works for files and directories alike.
-    func applyDate(toItemAtPath itemPath: String, dateFormatters: [DateFormatter]) {
+    mutating func applyDate(toItemAtPath itemPath: String, dateFormatters: [DateFormatter]) {
         let fileManager = FileManager.default
         let itemName = URL(fileURLWithPath: itemPath).lastPathComponent
 
@@ -232,7 +249,12 @@ extension RealDate {
             printIf(self.verbose, "realdate: \(itemName): Renamed to \(newName): Date \(dateString)")
         }
         catch {
-            print("realdate: \(itemName): \(error.localizedDescription)")
+            // Same reason as in processDirectory: the tool's own line first, Foundation's
+            // localized one behind -v. Reading the attributes, writing them and the rename
+            // all land here, which is why the message names no single operation.
+            printIf(true, "realdate: \(itemName): cannot be updated", to: .standardError)
+            printIf(self.verbose, "realdate: \(itemName): \(error.localizedDescription)", to: .standardError)
+            self.hadFailure = true
         }
     }
 
@@ -304,9 +326,27 @@ extension RealDate {
 }
 
 // MARK: - globals
-func printIf(_ condition: Bool, _ message: @autoclosure () -> String) {
-    if condition {
+/// Which stream a message goes to.
+///
+/// The split follows the file tools rather than this project's sibling mail2md, which
+/// puts everything on stderr: `cp -v` and `mv -v` report the work they did on stdout,
+/// and only failures go to stderr. So a log of what happened stays readable with
+/// `realdate -v … | less`, while `2>/dev/null` still silences nothing but the errors.
+enum MessageStream {
+    case standardOutput
+    case standardError
+}
+
+func printIf(_ condition: Bool, _ message: @autoclosure () -> String, to stream: MessageStream = .standardOutput) {
+    guard condition else {
+        return
+    }
+
+    switch stream {
+    case .standardOutput:
         print(message())
+    case .standardError:
+        FileHandle.standardError.write(Data("\(message())\n".utf8))
     }
 }
 

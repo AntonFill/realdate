@@ -210,6 +210,87 @@ struct CommandTests {
         #expect(try command.read("Beleg 2.md") == "Der Zweite")
     }
 
+    // MARK: - Failing
+
+    @Test("Reports a missing path on standard error and exits non-zero")
+    func failsOnMissingPath() throws {
+        let command = try CommandRunner()
+        defer {
+            command.removeWorkspace()
+        }
+
+        let run = try command.run(["does-not-exist.md"])
+
+        // Until 1.2.1 this was stdout with exit 0, so `realdate x || echo failed` never fired.
+        #expect(run.exitCode == 1)
+        #expect(run.standardOutput.isEmpty)
+        #expect(run.standardError == "realdate: does-not-exist.md: No such file or directory\n")
+    }
+
+    @Test("Reports an unreadable directory in the tool's own shape, and keeps Foundation's text behind -v")
+    func failsOnUnreadableDirectory() throws {
+        let command = try CommandRunner()
+        defer {
+            try? command.setPermissions(of: "locked", 0o755)
+            command.removeWorkspace()
+        }
+        try command.makeDirectory(named: "locked")
+        try command.setPermissions(of: "locked", 0o000)
+
+        let quiet = try command.run(["locked"])
+
+        #expect(quiet.exitCode == 1)
+        // Foundation's own line names the item in typographic quotes and is localized,
+        // so it must not be the whole message a user gets.
+        #expect(quiet.standardError == "realdate: locked: cannot be read\n")
+
+        let verbose = try command.run(["-v", "locked"])
+
+        #expect(verbose.exitCode == 1)
+        #expect(verbose.standardError.contains("realdate: locked: cannot be read\n"))
+        // The reason is still worth having, one level down.
+        #expect(verbose.standardError.contains("permission"))
+    }
+
+    @Test("Reports a rename it was not allowed to perform")
+    func failsOnDeniedRename() throws {
+        let command = try CommandRunner()
+        defer {
+            try? command.setPermissions(of: "ro", 0o755)
+            command.removeWorkspace()
+        }
+        try command.makeDirectory(named: "ro")
+        try command.makeFile(named: "ro/2026.04.01 Rechnung.md")
+        try command.setPermissions(of: "ro", 0o555)
+
+        let run = try command.run(["--rename", "ro/2026.04.01 Rechnung.md"])
+
+        #expect(run.exitCode == 1)
+        #expect(run.standardError == "realdate: 2026.04.01 Rechnung.md: cannot be updated\n")
+    }
+
+    @Test("Works through the rest of the tree after a failure, and still exits non-zero")
+    func continuesAfterFailure() throws {
+        let command = try CommandRunner()
+        defer {
+            try? command.setPermissions(of: "tree/locked", 0o755)
+            command.removeWorkspace()
+        }
+        try command.makeDirectory(named: "tree")
+        try command.makeFile(named: "tree/2026.02.02 Gut.md")
+        try command.makeDirectory(named: "tree/locked")
+        try command.setPermissions(of: "tree/locked", 0o000)
+
+        let run = try command.run(["-r", "--rename", "tree"])
+
+        // Same shape as chmod -R: one bad item does not abandon the others, and the
+        // failure surfaces once, at the end, as the exit code.
+        #expect(run.exitCode == 1)
+        #expect(run.standardError == "realdate: tree/locked: cannot be read\n")
+        #expect(command.exists("tree/Gut.md"))
+        #expect(try command.creationDate(of: "tree/Gut.md") == makeUTCDate(2026, 2, 2))
+    }
+
     // MARK: - Skipping
 
     @Test("Skips a symbolic link, reports it as a link, and never touches its target")
