@@ -97,10 +97,6 @@ The style was set by hand across the sources and is the reference. **When in dou
 - **Line length is not a limit.** A signature or a call stays on one line even at 150 characters. Breaking a line is a way to show structure, not a way to obey a number.
 - **Comments state the reason, not the mechanics.** `// Skip hidden files` says what the next line already says. The comments worth writing are the ones explaining why a directory is processed after its contents, or why midnight loses against a real time.
 
-## Known quirk
-
-Target names are lowercase (`realdate`, `realdateTests`) while the source directories are CamelCase (`Sources/RealDate`, `Tests/RealDateTests`). This builds on case-insensitive APFS and would break on a case-sensitive file system. It is known, and resolving it is the author's call. Please do not fold it into an unrelated pull request.
-
 ## Before you open a pull request
 
 ```sh
