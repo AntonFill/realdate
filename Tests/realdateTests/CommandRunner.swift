@@ -13,8 +13,8 @@ import Foundation
 /// run per invocation.
 ///
 /// Infrastructure rather than a test file, kept separate so that
-/// `RealDateCommandTests.swift` reads as the list of contracts the command keeps
-/// instead of process plumbing.
+/// `CommandTests.swift` and `CommandFailureTests.swift` read as the list of
+/// contracts the command keeps instead of process plumbing.
 struct CommandRunner {
 
     /// Creates the workspace the run happens in. Every test gets its own, so
@@ -66,9 +66,9 @@ extension CommandRunner {
     /// `TZ` is pinned to UTC, and that is load-bearing here rather than hygiene:
     /// the command parses the date from the name with `TimeZone.current`, so an
     /// unpinned zone would make every expected timestamp depend on the machine
-    /// running the tests. It also keeps the conversion visible, because the
-    /// timestamp a test asserts is then a UTC one while the developer machine sits
-    /// on `Europe/Zurich`.
+    /// running the tests. It also keeps the conversion visible on any machine that
+    /// is not itself on UTC, because the timestamp a test asserts is then a
+    /// different wall clock time than the one the developer reads.
     ///
     /// The rest of the environment is inherited, and that is load-bearing for the
     /// coverage number: under `--enable-code-coverage` the child picks up
@@ -261,7 +261,7 @@ extension CommandRunner {
 ///
 /// Separate from `makeDate(…)` in `TestingHelpers.swift`, which builds a local-time
 /// date for the in-process suites. Mixing the two would produce expectations that
-/// pass only in `Europe/Zurich`.
+/// only hold on whatever zone the author happened to be in.
 func makeUTCDate(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0, minute: Int = 0) -> Date? {
     var calendar = Calendar(identifier: .gregorian)
     guard let utc = TimeZone(identifier: "UTC") else {

@@ -124,7 +124,7 @@ Safe to use in a script: a failure is reported on stderr and answered with a non
 
 Failures go to **stderr**. Everything else, including the `-v` log of what was renamed and dated, goes to **stdout**, the way `cp -v` does. So `realdate -v -r … 2>/dev/null` shows the log and hides only the errors.
 
-Before v1.2.1 every failure was printed to stdout with exit code 0.
+Before v1.3.0 every failure was printed to stdout with exit code 0.
 
 ## Options
 

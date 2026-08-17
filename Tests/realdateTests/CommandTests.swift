@@ -57,17 +57,17 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md")
+        try command.makeFile(named: "2026.03.05 Receipt.md")
 
-        let run = try command.run(["2026.03.05 Beleg.md"])
+        let run = try command.run(["2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
         // Detail belongs behind -v, so a plain run says nothing on either stream.
         #expect(run.standardOutput.isEmpty)
         #expect(run.standardError.isEmpty)
-        #expect(try command.creationDate(of: "2026.03.05 Beleg.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.creationDate(of: "2026.03.05 Receipt.md") == makeUTCDate(2026, 3, 5))
         // Without --rename the name is untouched.
-        #expect(try command.contents() == ["2026.03.05 Beleg.md"])
+        #expect(try command.contents() == ["2026.03.05 Receipt.md"])
     }
 
     @Test("A date-only name does not overwrite a real clock time on the same day")
@@ -76,15 +76,15 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md")
+        try command.makeFile(named: "2026.03.05 Receipt.md")
         let created = try #require(makeUTCDate(2026, 3, 5, hour: 9, minute: 30))
-        try command.setTimestamps(of: "2026.03.05 Beleg.md", creation: created)
+        try command.setTimestamps(of: "2026.03.05 Receipt.md", creation: created)
 
-        let run = try command.run(["-v", "2026.03.05 Beleg.md"])
+        let run = try command.run(["-v", "2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
         // The midnight in the name is a product of the format, not a measurement.
-        #expect(try command.creationDate(of: "2026.03.05 Beleg.md") == created)
+        #expect(try command.creationDate(of: "2026.03.05 Receipt.md") == created)
         #expect(run.standardOutput.contains("time kept"))
     }
 
@@ -94,15 +94,15 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md")
+        try command.makeFile(named: "2026.03.05 Receipt.md")
         let earlier = try #require(makeUTCDate(2026, 1, 1))
-        try command.setTimestamps(of: "2026.03.05 Beleg.md", modification: earlier)
+        try command.setTimestamps(of: "2026.03.05 Receipt.md", modification: earlier)
 
-        let run = try command.run(["2026.03.05 Beleg.md"])
+        let run = try command.run(["2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
         // Otherwise the file would claim it was modified before it was created.
-        #expect(try command.modificationDate(of: "2026.03.05 Beleg.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.modificationDate(of: "2026.03.05 Receipt.md") == makeUTCDate(2026, 3, 5))
     }
 
     @Test("Leaves a later modification date alone")
@@ -111,16 +111,16 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md")
+        try command.makeFile(named: "2026.03.05 Receipt.md")
         let later = try #require(makeUTCDate(2026, 6, 1, hour: 14, minute: 0))
-        try command.setTimestamps(of: "2026.03.05 Beleg.md", modification: later)
+        try command.setTimestamps(of: "2026.03.05 Receipt.md", modification: later)
 
-        let run = try command.run(["2026.03.05 Beleg.md"])
+        let run = try command.run(["2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
         // An edit after the date in the name is a fact, and the name does not know it.
-        #expect(try command.modificationDate(of: "2026.03.05 Beleg.md") == later)
-        #expect(try command.creationDate(of: "2026.03.05 Beleg.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.modificationDate(of: "2026.03.05 Receipt.md") == later)
+        #expect(try command.creationDate(of: "2026.03.05 Receipt.md") == makeUTCDate(2026, 3, 5))
     }
 
     // MARK: - Renaming
@@ -131,14 +131,14 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md", content: "Rechnungsbetrag")
+        try command.makeFile(named: "2026.03.05 Receipt.md", content: "Invoice total")
 
-        let run = try command.run(["--rename", "2026.03.05 Beleg.md"])
+        let run = try command.run(["--rename", "2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
-        #expect(try command.contents() == ["Beleg.md"])
-        #expect(try command.read("Beleg.md") == "Rechnungsbetrag")
-        #expect(try command.creationDate(of: "Beleg.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.contents() == ["Receipt.md"])
+        #expect(try command.read("Receipt.md") == "Invoice total")
+        #expect(try command.creationDate(of: "Receipt.md") == makeUTCDate(2026, 3, 5))
     }
 
     @Test("Numbers the file instead of overwriting an existing target name")
@@ -147,16 +147,16 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "Beleg.md", content: "Der Erste")
-        try command.makeFile(named: "2026.03.05 Beleg.md", content: "Der Zweite")
+        try command.makeFile(named: "Receipt.md", content: "The first one")
+        try command.makeFile(named: "2026.03.05 Receipt.md", content: "The second one")
 
-        let run = try command.run(["--rename", "2026.03.05 Beleg.md"])
+        let run = try command.run(["--rename", "2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 0)
-        #expect(try command.contents() == ["Beleg 2.md", "Beleg.md"])
+        #expect(try command.contents() == ["Receipt 2.md", "Receipt.md"])
         // The file that was already there must be the one that keeps its name.
-        #expect(try command.read("Beleg.md") == "Der Erste")
-        #expect(try command.read("Beleg 2.md") == "Der Zweite")
+        #expect(try command.read("Receipt.md") == "The first one")
+        #expect(try command.read("Receipt 2.md") == "The second one")
     }
 
     // MARK: - Skipping
@@ -167,16 +167,16 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "Ziel.md")
+        try command.makeFile(named: "Target.md")
         let untouched = try #require(makeUTCDate(2020, 1, 1))
-        try command.setTimestamps(of: "Ziel.md", creation: untouched)
-        try command.makeSymbolicLink(named: "2026.03.05 Link.md", to: "Ziel.md")
+        try command.setTimestamps(of: "Target.md", creation: untouched)
+        try command.makeSymbolicLink(named: "2026.03.05 Link.md", to: "Target.md")
 
         let run = try command.run(["--rename", "2026.03.05 Link.md"])
 
         #expect(run.exitCode == 0)
         // The timestamp would otherwise land outside the path the user named.
-        #expect(try command.creationDate(of: "Ziel.md") == untouched)
+        #expect(try command.creationDate(of: "Target.md") == untouched)
         #expect(command.exists("2026.03.05 Link.md"))
         // A dangling link is reported as a link, not as a missing file, so the wording matters.
         #expect(run.standardOutput.contains("realdate: 2026.03.05 Link.md: Skipping symbolic link"))
@@ -188,21 +188,21 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "Ohnedatum.md")
+        try command.makeFile(named: "Undated.md")
         let untouched = try #require(makeUTCDate(2020, 1, 1))
-        try command.setTimestamps(of: "Ohnedatum.md", creation: untouched)
+        try command.setTimestamps(of: "Undated.md", creation: untouched)
 
-        let quiet = try command.run(["--rename", "Ohnedatum.md"])
+        let quiet = try command.run(["--rename", "Undated.md"])
 
         #expect(quiet.exitCode == 0)
         #expect(quiet.standardOutput.isEmpty)
         // No date guessing: a name matching no format is left as it is.
-        #expect(try command.creationDate(of: "Ohnedatum.md") == untouched)
-        #expect(try command.contents() == ["Ohnedatum.md"])
+        #expect(try command.creationDate(of: "Undated.md") == untouched)
+        #expect(try command.contents() == ["Undated.md"])
 
-        let verbose = try command.run(["-v", "--rename", "Ohnedatum.md"])
+        let verbose = try command.run(["-v", "--rename", "Undated.md"])
 
-        #expect(verbose.standardOutput.contains("realdate: Ohnedatum.md: No date prefix found, skipping"))
+        #expect(verbose.standardOutput.contains("realdate: Undated.md: No date prefix found, skipping"))
     }
 
     // MARK: - Directories
@@ -213,16 +213,16 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeDirectory(named: "2026.01.02 Ordner")
-        try command.makeFile(named: "2026.01.02 Ordner/2026.01.04 Datei.md")
+        try command.makeDirectory(named: "2026.01.02 Folder")
+        try command.makeFile(named: "2026.01.02 Folder/2026.01.04 File.md")
 
-        let run = try command.run(["--rename", "2026.01.02 Ordner"])
+        let run = try command.run(["--rename", "2026.01.02 Folder"])
 
         #expect(run.exitCode == 0)
         // The directory keeps its prefix without -d, so this stays a non-breaking default.
-        #expect(try command.contents() == ["2026.01.02 Ordner"])
-        #expect(command.exists("2026.01.02 Ordner/Datei.md"))
-        #expect(try command.creationDate(of: "2026.01.02 Ordner/Datei.md") == makeUTCDate(2026, 1, 4))
+        #expect(try command.contents() == ["2026.01.02 Folder"])
+        #expect(command.exists("2026.01.02 Folder/File.md"))
+        #expect(try command.creationDate(of: "2026.01.02 Folder/File.md") == makeUTCDate(2026, 1, 4))
     }
 
     @Test("Dates and renames the directory itself with -d")
@@ -231,15 +231,15 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeDirectory(named: "2026.01.02 Ordner")
-        try command.makeFile(named: "2026.01.02 Ordner/2026.01.04 Datei.md")
+        try command.makeDirectory(named: "2026.01.02 Folder")
+        try command.makeFile(named: "2026.01.02 Folder/2026.01.04 File.md")
 
-        let run = try command.run(["-d", "--rename", "2026.01.02 Ordner"])
+        let run = try command.run(["-d", "--rename", "2026.01.02 Folder"])
 
         #expect(run.exitCode == 0)
-        #expect(try command.contents() == ["Ordner"])
-        #expect(try command.creationDate(of: "Ordner") == makeUTCDate(2026, 1, 2))
-        #expect(command.exists("Ordner/Datei.md"))
+        #expect(try command.contents() == ["Folder"])
+        #expect(try command.creationDate(of: "Folder") == makeUTCDate(2026, 1, 2))
+        #expect(command.exists("Folder/File.md"))
     }
 
     @Test("Handles a directory after everything inside it")
@@ -248,25 +248,25 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeDirectory(named: "2026.01.02 Ordner/2026.01.03 Unter")
-        try command.makeFile(named: "2026.01.02 Ordner/2026.01.04 Datei.md")
+        try command.makeDirectory(named: "2026.01.02 Folder/2026.01.03 Inner")
+        try command.makeFile(named: "2026.01.02 Folder/2026.01.04 File.md")
 
-        let run = try command.run(["-r", "-d", "-v", "--rename", "2026.01.02 Ordner"])
+        let run = try command.run(["-r", "-d", "-v", "--rename", "2026.01.02 Folder"])
 
         #expect(run.exitCode == 0)
 
         let lines = run.standardOutput.split(separator: "\n").map(String.init)
-        let outer = try #require(lines.firstIndex { $0.contains("2026.01.02 Ordner: Renamed to Ordner") })
-        let inner = try #require(lines.firstIndex { $0.contains("2026.01.03 Unter: Renamed to Unter") })
-        let file = try #require(lines.firstIndex { $0.contains("2026.01.04 Datei.md: Renamed to Datei.md") })
+        let outer = try #require(lines.firstIndex { $0.contains("2026.01.02 Folder: Renamed to Folder") })
+        let inner = try #require(lines.firstIndex { $0.contains("2026.01.03 Inner: Renamed to Inner") })
+        let file = try #require(lines.firstIndex { $0.contains("2026.01.04 File.md: Renamed to File.md") })
 
         // Every write inside a directory lifts its modification date, so dating it first
         // would be undone immediately.
         #expect(outer > inner)
         #expect(outer > file)
-        #expect(try command.contents() == ["Ordner"])
-        #expect(command.exists("Ordner/Unter"))
-        #expect(command.exists("Ordner/Datei.md"))
+        #expect(try command.contents() == ["Folder"])
+        #expect(command.exists("Folder/Inner"))
+        #expect(command.exists("Folder/File.md"))
     }
 
     // MARK: - Formats
@@ -277,13 +277,13 @@ struct CommandTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "05-03-2026 Beleg.md")
+        try command.makeFile(named: "05-03-2026 Receipt.md")
 
-        let run = try command.run(["--format", "dd-MM-yyyy", "--rename", "05-03-2026 Beleg.md"])
+        let run = try command.run(["--format", "dd-MM-yyyy", "--rename", "05-03-2026 Receipt.md"])
 
         #expect(run.exitCode == 0)
-        #expect(try command.contents() == ["Beleg.md"])
-        #expect(try command.creationDate(of: "Beleg.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.contents() == ["Receipt.md"])
+        #expect(try command.creationDate(of: "Receipt.md") == makeUTCDate(2026, 3, 5))
     }
 
     @Test("Falls through the formats in the order they were given")
@@ -293,15 +293,15 @@ struct CommandTests {
             command.removeWorkspace()
         }
         try command.makeFile(named: "2026.03.05.09.41 Mail.md")
-        try command.makeFile(named: "2026.03.05 Notiz.md")
+        try command.makeFile(named: "2026.03.05 Note.md")
 
         // Both presets in their default order: the one carrying a time has to be tried first,
         // or the shorter one would match its prefix and swallow the time.
         let run = try command.run(["-r", "--rename", "."])
 
         #expect(run.exitCode == 0)
-        #expect(try command.contents() == ["Mail.md", "Notiz.md"])
+        #expect(try command.contents() == ["Mail.md", "Note.md"])
         #expect(try command.creationDate(of: "Mail.md") == makeUTCDate(2026, 3, 5, hour: 9, minute: 41))
-        #expect(try command.creationDate(of: "Notiz.md") == makeUTCDate(2026, 3, 5))
+        #expect(try command.creationDate(of: "Note.md") == makeUTCDate(2026, 3, 5))
     }
 }

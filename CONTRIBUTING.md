@@ -1,4 +1,4 @@
-# Contributing to RealDate
+# Contributing to realdate
 
 This is a small tool with one author and a deliberately narrow scope.
 
@@ -57,9 +57,11 @@ These are not negotiable, and they apply to sources and tests alike.
 
 Most suites run **in process**: they build the command with `makeRealDate(…)` and call `run()` on it. That is where a behavior gets covered thoroughly, because a test there costs nothing.
 
-`CommandTests.swift` is the level above. Every test in it launches the **built binary** as a subprocess through `CommandRunner`, so what it measures is the command a user types: argument parsing, the exit code, the split between stdout and stderr, and what the run left on disk. None of that is reachable in process, because `run()` neither parses arguments nor exits.
+`CommandTests.swift` and `CommandFailureTests.swift` are the level above. Every test in them launches the **built binary** as a subprocess through `CommandRunner`, so what it measures is the command a user types: argument parsing, the exit code, the split between stdout and stderr, and what the run left on disk. None of that is reachable in process, because `run()` neither parses arguments nor exits.
 
-- **Put a behavior in process** unless it needs one of those four things. The upper level is the second line of defence, not the first: it stays around a dozen tests and does not repeat what the suites below already pin.
+The two files split by outcome, because that is what a user sees: `CommandTests` holds what the command does, `CommandFailureTests` what it refuses (exit 64, nothing ran) and what it cannot do (exit 1, work started and failed).
+
+- **Put a behavior in process** unless it needs one of those four things. The upper level is the second line of defence, not the first: it stays around two dozen tests in total and does not repeat what the suites below already pin.
 - **`CommandRunner` pins `TZ=UTC` for the subprocess**, and that is load-bearing rather than hygiene. The command parses the date from the name with `TimeZone.current`, so an unpinned zone makes every expected timestamp depend on the machine. Build expectations with `makeUTCDate(…)` from `CommandRunner.swift`, never with `makeDate(…)`, which is local time for the in-process suites.
 - **Never assert a rendered date.** `DateFormatter.mediumDateShortTime` renders in the machine's locale, so `05.03.2026, 00:00` on one machine is `Mar 5, 2026 at 12:00 AM` on the next. Assert the timestamp on disk plus the fixed English fragments around it.
 - **Measure the expected output at the running command** before writing the test, rather than deriving it from the sources. A test derived from the code under test only proves the derivation.
@@ -73,7 +75,7 @@ Most suites run **in process**: they build the command with `makeRealDate(…)` 
 - Detail goes through `printIf(self.verbose, …)`. Anything the user did not ask for stays behind `-v`.
 - A skip says **what** was skipped and why: a dangling link is reported as a link, not as a missing file, which is why the symlink check runs before the existence check.
 
-Unix means the stream and the exit code too, not just the shape of the line. Until 1.2.1 every failure went to stdout with exit 0, so `realdate … || echo failed` could never fire. The split now:
+Unix means the stream and the exit code too, not just the shape of the line. Until 1.3.0 every failure went to stdout with exit 0, so `realdate … || echo failed` could never fire. The split now:
 
 | | Stream | Exit code | Examples |
 |---|---|---|---|

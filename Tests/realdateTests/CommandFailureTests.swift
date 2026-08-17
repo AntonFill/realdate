@@ -47,14 +47,14 @@ struct CommandFailureTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "2026.03.05 Beleg.md")
+        try command.makeFile(named: "2026.03.05 Receipt.md")
 
-        let run = try command.run(["--bogus", "2026.03.05 Beleg.md"])
+        let run = try command.run(["--bogus", "2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 64)
         #expect(run.standardError.contains("Unknown option '--bogus'"))
         // The run must not have half-processed the file before noticing.
-        #expect(command.exists("2026.03.05 Beleg.md"))
+        #expect(command.exists("2026.03.05 Receipt.md"))
     }
 
     @Test("Rejects an empty format instead of dating a whole tree to the reference date")
@@ -63,11 +63,11 @@ struct CommandFailureTests {
         defer {
             command.removeWorkspace()
         }
-        try command.makeFile(named: "Wichtig.md")
-        try command.makeDirectory(named: "Unter")
-        try command.makeFile(named: "Unter/2026.08.01 Notiz.md")
+        try command.makeFile(named: "Important.md")
+        try command.makeDirectory(named: "Inner")
+        try command.makeFile(named: "Inner/2026.08.01 Note.md")
         let untouched = try #require(makeUTCDate(2026, 8, 1, hour: 16, minute: 12))
-        try command.setTimestamps(of: "Wichtig.md", creation: untouched)
+        try command.setTimestamps(of: "Important.md", creation: untouched)
 
         // How this arrives in practice: --format "$FORMAT" with the variable unset.
         let run = try command.run(["-r", "--rename", "--format", "", "."])
@@ -76,9 +76,9 @@ struct CommandFailureTests {
         #expect(run.standardError.contains("--format needs a date format, not an empty string."))
         // An empty format matches every name, dates it to 2000-01-01, and trims nothing
         // off, so --rename would move each file aside without any visible reason.
-        #expect(try command.contents().sorted() == ["Unter", "Wichtig.md"])
-        #expect(try command.creationDate(of: "Wichtig.md") == untouched)
-        #expect(command.exists("Unter/2026.08.01 Notiz.md"))
+        #expect(try command.contents().sorted() == ["Important.md", "Inner"])
+        #expect(try command.creationDate(of: "Important.md") == untouched)
+        #expect(command.exists("Inner/2026.08.01 Note.md"))
     }
 
     // MARK: - Work started and failed
@@ -92,7 +92,7 @@ struct CommandFailureTests {
 
         let run = try command.run(["does-not-exist.md"])
 
-        // Until 1.2.1 this was stdout with exit 0, so `realdate x || echo failed` never fired.
+        // Until 1.3.0 this was stdout with exit 0, so `realdate x || echo failed` never fired.
         #expect(run.exitCode == 1)
         #expect(run.standardOutput.isEmpty)
         #expect(run.standardError == "realdate: does-not-exist.md: No such file or directory\n")
@@ -131,13 +131,13 @@ struct CommandFailureTests {
             command.removeWorkspace()
         }
         try command.makeDirectory(named: "ro")
-        try command.makeFile(named: "ro/2026.04.01 Rechnung.md")
+        try command.makeFile(named: "ro/2026.04.01 Invoice.md")
         try command.setPermissions(of: "ro", 0o555)
 
-        let run = try command.run(["--rename", "ro/2026.04.01 Rechnung.md"])
+        let run = try command.run(["--rename", "ro/2026.04.01 Invoice.md"])
 
         #expect(run.exitCode == 1)
-        #expect(run.standardError == "realdate: 2026.04.01 Rechnung.md: cannot be updated\n")
+        #expect(run.standardError == "realdate: 2026.04.01 Invoice.md: cannot be updated\n")
     }
 
     @Test("Works through the rest of the tree after a failure, and still exits non-zero")
@@ -148,7 +148,7 @@ struct CommandFailureTests {
             command.removeWorkspace()
         }
         try command.makeDirectory(named: "tree")
-        try command.makeFile(named: "tree/2026.02.02 Gut.md")
+        try command.makeFile(named: "tree/2026.02.02 Good.md")
         try command.makeDirectory(named: "tree/locked")
         try command.setPermissions(of: "tree/locked", 0o000)
 
@@ -158,8 +158,7 @@ struct CommandFailureTests {
         // failure surfaces once, at the end, as the exit code.
         #expect(run.exitCode == 1)
         #expect(run.standardError == "realdate: tree/locked: cannot be read\n")
-        #expect(command.exists("tree/Gut.md"))
-        #expect(try command.creationDate(of: "tree/Gut.md") == makeUTCDate(2026, 2, 2))
+        #expect(command.exists("tree/Good.md"))
+        #expect(try command.creationDate(of: "tree/Good.md") == makeUTCDate(2026, 2, 2))
     }
-
 }
