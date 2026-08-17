@@ -12,7 +12,7 @@ import ArgumentParser
 struct RealDate: ParsableCommand {
     static let appname = "realdate"
     static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
-    static let version = "1.2.0"
+    static let version = "1.2.1"
 
     static let configuration = CommandConfiguration(
         commandName: Self.appname,
@@ -37,6 +37,20 @@ struct RealDate: ParsableCommand {
 
     @Argument(help: "Path to file(s) or directory.")
     var path: String
+
+    /// Rejects a format that cannot describe a date.
+    ///
+    /// The empty format is the one that does damage, and it arrives by accident rather
+    /// than by intent: `--format "$FORMAT"` with an unset variable. A `DateFormatter`
+    /// with an empty format parses every name to its reference date, so a whole tree
+    /// gets dated to 2000-01-01 from a typo, and because nothing is trimmed off the
+    /// name, `--rename` leaves no visible trace either. This is the same rule as "no
+    /// date guessing", one step earlier: a format that matches everything is not a format.
+    func validate() throws {
+        guard self.format.allSatisfy({ $0.isEmpty == false }) else {
+            throw ValidationError("--format needs a date format, not an empty string.")
+        }
+    }
 
     mutating func run() throws {
         let dateFormatters = self.format.map { $0.customDateFormatter() }
@@ -196,11 +210,16 @@ extension RealDate {
             }
 
             // Rename item and set timestamps
-            let directory = URL(fileURLWithPath: itemPath).deletingLastPathComponent().path
+            let itemURL = URL(fileURLWithPath: itemPath)
+            let directory = itemURL.deletingLastPathComponent().path
             var newPath = (directory as NSString).appendingPathComponent(tuple.name)
 
-            // Handle duplicates
-            if fileManager.fileExists(atPath: newPath) && newPath != itemPath {
+            // Compared against the URL's path rather than against the string the caller
+            // passed in: `itemPath` may be relative, while `newPath` was built from the
+            // same URL and is therefore absolute. Comparing the two raw strings made an
+            // item whose target name equals its current name look like a collision, so it
+            // was moved to "<name> 2" instead of being left alone.
+            if fileManager.fileExists(atPath: newPath) && newPath != itemURL.path {
                 newPath = self.findAvailablePath(newPath)
                 let newName = URL(fileURLWithPath: newPath).lastPathComponent
                 printIf(self.verbose, "realdate: \(itemName): Duplicate found, renamed to \(newName)")

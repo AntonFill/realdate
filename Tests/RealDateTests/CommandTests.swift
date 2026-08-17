@@ -76,6 +76,30 @@ struct CommandTests {
         #expect(command.exists("2026.03.05 Beleg.md"))
     }
 
+    @Test("Rejects an empty format instead of dating a whole tree to the reference date")
+    func rejectsEmptyFormat() throws {
+        let command = try CommandRunner()
+        defer {
+            command.removeWorkspace()
+        }
+        try command.makeFile(named: "Wichtig.md")
+        try command.makeDirectory(named: "Unter")
+        try command.makeFile(named: "Unter/2026.08.01 Notiz.md")
+        let untouched = try #require(makeUTCDate(2026, 8, 1, hour: 16, minute: 12))
+        try command.setTimestamps(of: "Wichtig.md", creation: untouched)
+
+        // How this arrives in practice: --format "$FORMAT" with the variable unset.
+        let run = try command.run(["-r", "--rename", "--format", "", "."])
+
+        #expect(run.exitCode == 64)
+        #expect(run.standardError.contains("--format needs a date format, not an empty string."))
+        // An empty format matches every name, dates it to 2000-01-01, and trims nothing
+        // off, so --rename would move each file aside without any visible reason.
+        #expect(try command.contents().sorted() == ["Unter", "Wichtig.md"])
+        #expect(try command.creationDate(of: "Wichtig.md") == untouched)
+        #expect(command.exists("Unter/2026.08.01 Notiz.md"))
+    }
+
     // MARK: - Timestamps
 
     @Test("Sets the creation date from the name and stays silent about it")
