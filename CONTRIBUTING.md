@@ -53,6 +53,20 @@ These are not negotiable, and they apply to sources and tests alike.
 - **Every test that touches the file system gets its own directory** from `createTestDirectory()`, which keys on `#fileID` plus a UUID. Suites run in parallel; a shared path means a regressed tool walks through another test's files.
 - Prove a behavior by disabling it. If the suite still passes with the code removed, the test was measuring something else.
 
+#### The two levels, and which one your test belongs on
+
+Most suites run **in process**: they build the command with `makeRealDate(…)` and call `run()` on it. That is where a behavior gets covered thoroughly, because a test there costs nothing.
+
+`CommandTests.swift` is the level above. Every test in it launches the **built binary** as a subprocess through `CommandRunner`, so what it measures is the command a user types: argument parsing, the exit code, the split between stdout and stderr, and what the run left on disk. None of that is reachable in process, because `run()` neither parses arguments nor exits.
+
+- **Put a behavior in process** unless it needs one of those four things. The upper level is the second line of defence, not the first: it stays around a dozen tests and does not repeat what the suites below already pin.
+- **`CommandRunner` pins `TZ=UTC` for the subprocess**, and that is load-bearing rather than hygiene. The command parses the date from the name with `TimeZone.current`, so an unpinned zone makes every expected timestamp depend on the machine. Build expectations with `makeUTCDate(…)` from `CommandRunner.swift`, never with `makeDate(…)`, which is local time for the in-process suites.
+- **Never assert a rendered date.** `DateFormatter.mediumDateShortTime` renders in the machine's locale, so `05.03.2026, 00:00` on one machine is `Mar 5, 2026 at 12:00 AM` on the next. Assert the timestamp on disk plus the fixed English fragments around it.
+- **Measure the expected output at the running command** before writing the test, rather than deriving it from the sources. A test derived from the code under test only proves the derivation.
+- **The rest of the environment is inherited on purpose.** Under `--enable-code-coverage` the child picks up `LLVM_PROFILE_FILE` and writes into the same merge pool, which is how `RealDate.swift` gets counted for a subprocess run at all.
+
+> Coverage does not tell you whether this level exists. Measured on 2026-08-17: adding it moved line coverage from 90.94 % to 93.03 %, because the in-process suites already execute nearly every line. What was missing was not execution but assertion, and the first run of the new level found two defects the 39 tests below could not see.
+
 ### Output and errors
 
 - Error style is Unix: `realdate: <path>: <message>`.
