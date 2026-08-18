@@ -1,5 +1,7 @@
 # realdate
 
+[![CI](https://github.com/AntonFill/realdate/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonFill/realdate/actions/workflows/ci.yml)
+
 A CLI tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
 
 ## Problem
