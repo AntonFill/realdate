@@ -82,4 +82,33 @@ struct ModificationDateTests {
 
         #expect(created <= modified)
     }
+
+    @Test("Lifting the modification date leaves a kept clock time where it is")
+    func liftKeepsKeptTime() throws {
+        let tempDir = try createTestDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        let testURL = tempDir.appendingPathComponent("2020.01.02 Note.md")
+        try "Test content".write(to: testURL, atomically: true, encoding: .utf8)
+        let path = testURL.path(percentEncoded: false)
+
+        // The modification date has to go first: APFS pulls the creation date down to any
+        // earlier modification date it is given, but lets a later creation date stand
+        // (measured 2026-10-18). That is how a creation date ends up after the last edit.
+        let staleDate = Date(timeIntervalSince1970: 1_000_000_000) // 2001-09-09
+        try FileManager.default.setAttributes([.modificationDate: staleDate], ofItemAtPath: path)
+        let created = try makeDate(2020, 1, 2, hour: 12, minute: 15)
+        try FileManager.default.setAttributes([.creationDate: created], ofItemAtPath: path)
+
+        var realDate = makeRealDate(path: path)
+        try realDate.run()
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: path)
+        // Lifted only to the midnight of the name, the modification date would drag the kept
+        // 12:15 down with it, while the verbose line still said the time was kept.
+        #expect(attributes[.creationDate] as? Date == created)
+        #expect(attributes[.modificationDate] as? Date == created)
+    }
 }

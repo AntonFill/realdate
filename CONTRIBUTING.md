@@ -30,7 +30,7 @@ That line is why some obvious-looking features are absent:
 This is the rule behind the timestamp behavior, and it is worth stating before you change anything in `applyDate`:
 
 - The **creation date** comes from the name. But a date-only format parses to midnight, and that midnight is a product of the format rather than a measurement. If the file already carries a real clock time on that same day, the time stays.
-- The **modification date** is only ever lifted, never pulled back. An edit made after the date in the name is a fact, and the name does not know about it. Lifting happens only when the name is newer, which would otherwise leave a file modified before it was created.
+- The **modification date** is only ever lifted, never pulled back. An edit made after the date in the name is a fact, and the name does not know about it. Lifting happens only when the creation date the item ends up with is newer, and it goes to exactly that date: otherwise the file would be modified before it was created, and APFS settles that by pulling the creation date down to the modification date, which undoes a kept clock time.
 
 Both follow from the same idea: the name says when a document *is from*, the file system says what *happened to it*. Neither gets to overwrite the other with something vaguer.
 

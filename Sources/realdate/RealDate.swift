@@ -317,14 +317,18 @@ extension RealDate {
             var attributes: [FileAttributeKey: Any] = [:]
 
             let keptTime = self.existingTimeToKeep(for: tuple, attributes: currentAttributes)
+            let creationDate = keptTime ?? tuple.date
             if keptTime == nil {
-                attributes[.creationDate] = tuple.date
+                attributes[.creationDate] = creationDate
             }
 
             // The modification date is only lifted, never pulled back: an item edited after
-            // the date in its name keeps the record of that edit.
-            if let modified = currentAttributes[.modificationDate] as? Date, modified < tuple.date {
-                attributes[.modificationDate] = tuple.date
+            // the date in its name keeps the record of that edit. It is lifted to the creation
+            // date the item ends up with rather than to the date in the name: APFS pulls a
+            // creation date down to any earlier modification date it is given, so lifting only
+            // as far as the name would undo a kept clock time (measured 2026-10-18).
+            if let modified = currentAttributes[.modificationDate] as? Date, modified < creationDate {
+                attributes[.modificationDate] = creationDate
             }
 
             if attributes.isEmpty == false {
