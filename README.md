@@ -138,7 +138,7 @@ Before v1.3.0 every failure was printed to stdout with exit code 0.
 
 ## Options
 
-Copied from `realdate --help`, which is the authority. If the two ever disagree, the help is right.
+Copied from `realdate --help`, which is the authority. If the two ever disagree, the help is right. In a terminal the help wraps to the width of the window; here it is shown at 80 columns, as a pipe prints it.
 
 ```bash
 ARGUMENTS:
@@ -148,9 +148,9 @@ OPTIONS:
   --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
                           yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
                           yyyy.MM.dd)
-  --default-time <HH:mm>  Clock time for a name that states only a day,
-                          instead of midnight. A time the item already has on
-                          that day, from its creation or an edit, comes first.
+  --default-time <HH:mm>  Clock time for a name that states only a day, instead
+                          of midnight. A time the item already has on that day,
+                          from its creation or an edit, comes first.
   -r, --recursive         Search recursively in subdirectories.
   -v, --verbose           Show detailed information.
   --rename                Set timestamps, and rename files.

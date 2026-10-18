@@ -49,6 +49,24 @@ struct CommandTests {
         #expect(run.standardError.isEmpty)
     }
 
+    @Test("Wraps its help to COLUMNS, and to 80 columns when there is no window")
+    func wrapsHelpToWidth() throws {
+        let command = try CommandRunner()
+        defer {
+            command.removeWorkspace()
+        }
+
+        let wide = try command.run(["--help"], environment: ["COLUMNS": "120"])
+        // Standard output is a file here, so without COLUMNS there is no window to measure.
+        let plain = try command.run(["--help"], environment: ["COLUMNS": nil])
+
+        #expect(wide.exitCode == 0)
+        #expect(wide.standardOutput == RealDate.helpPage.rendered(width: 120) + "\n")
+        #expect(plain.standardOutput == RealDate.helpPage.rendered(width: 80) + "\n")
+        // The two only differ if the width actually reached the layout.
+        #expect(wide.standardOutput != plain.standardOutput)
+    }
+
     // MARK: - Timestamps
 
     @Test("Sets the creation date from the name and stays silent about it")

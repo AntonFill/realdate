@@ -11,7 +11,7 @@ import CommandLineOptions
 @main
 struct RealDate: Equatable {
     static let appname = "realdate"
-    static let version = "1.4.0"
+    static let version = "1.4.1"
 
     /// The format with a time comes first: the date-only one also matches the start of a
     /// name that carries a time, and the time would be lost.
@@ -155,41 +155,37 @@ extension RealDate {
 // MARK: - Help
 extension RealDate {
 
+    /// The command line in brief, shared by the help and the usage error.
+    static let synopsis = "realdate [--format <format> ...] [--default-time <HH:mm>] [--recursive] [--verbose] [--rename] [--directories] <path>"
+
     /// What follows a usage error, the way `rm` and `cp` print theirs.
     static let usage = """
-        usage: realdate [--format <format> ...] [--default-time <HH:mm>] [--recursive] [--verbose] [--rename] [--directories] <path>
+        usage: \(RealDate.synopsis)
         See 'realdate --help' for more information.
         """
 
-    /// Written by hand in the layout ArgumentParser generated up to 1.3.0. The `## Options`
-    /// block in the README is a copy of what this prints.
-    static let help = """
-        OVERVIEW: Extract date from filename prefix, set file timestamps, and remove
-        date from filename.
-
-        USAGE: realdate [--format <format> ...] [--default-time <HH:mm>] [--recursive] [--verbose] [--rename] [--directories] <path>
-
-        ARGUMENTS:
-          <path>                  Path to file(s) or directory.
-
-        OPTIONS:
-          --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
-                                  yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
-                                  yyyy.MM.dd)
-          --default-time <HH:mm>  Clock time for a name that states only a day,
-                                  instead of midnight. A time the item already has on
-                                  that day, from its creation or an edit, comes first.
-          -r, --recursive         Search recursively in subdirectories.
-          -v, --verbose           Show detailed information.
-          --rename                Set timestamps, and rename files.
-          -d, --directories       Treat a directory itself as an item: set its
-                                  timestamps, and rename it with --rename. Applies to
-                                  the given directory, and to every visited
-                                  subdirectory with -r.
-          --version               Show the version.
-          -h, --help              Show help information.
-
-        """
+    /// Laid out in ArgumentParser's layout and wrapped to the window, as the help was up to
+    /// 1.3.0. The `## Options` block in the README is a copy of what this prints in a pipe,
+    /// at 80 columns.
+    static let helpPage = HelpPage(
+        overview: "Extract date from filename prefix, set file timestamps, and remove date from filename.",
+        usage: RealDate.synopsis,
+        sections: [
+            HelpPage.Section("ARGUMENTS", [
+                HelpPage.Entry("<path>", "Path to file(s) or directory."),
+            ]),
+            HelpPage.Section("OPTIONS", [
+                HelpPage.Entry("--format <format>", "Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd, yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm, yyyy.MM.dd)"),
+                HelpPage.Entry("--default-time <HH:mm>", "Clock time for a name that states only a day, instead of midnight. A time the item already has on that day, from its creation or an edit, comes first."),
+                HelpPage.Entry("-r, --recursive", "Search recursively in subdirectories."),
+                HelpPage.Entry("-v, --verbose", "Show detailed information."),
+                HelpPage.Entry("--rename", "Set timestamps, and rename files."),
+                HelpPage.Entry("-d, --directories", "Treat a directory itself as an item: set its timestamps, and rename it with --rename. Applies to the given directory, and to every visited subdirectory with -r."),
+                HelpPage.Entry("--version", "Show the version."),
+                HelpPage.Entry("-h, --help", "Show help information."),
+            ]),
+        ]
+    )
 }
 
 // MARK: - Entry point
@@ -209,7 +205,7 @@ extension RealDate {
 
         switch invocation {
         case .help:
-            print(Self.help)
+            print(Self.helpPage.rendered(width: HelpPage.screenWidth))
         case .version:
             print(Self.version)
         case .run(var command):

@@ -49,13 +49,13 @@ These are not negotiable, and they apply to sources and tests alike.
 
 ### The command line
 
-realdate reads its arguments with `CommandLineOptions`, a module in this package rather than a dependency. It follows getopt: grouped short flags, a value attached or as the next argument, options after the path, `--` to end them. Its two departures from getopt, and why, are documented on `OptionParser`. The module knows nothing about realdate, so it can move into a package of its own once a second tool uses it.
+realdate reads its arguments with `CommandLineOptions`, a module in this package rather than a dependency. It follows getopt: grouped short flags, a value attached or as the next argument, options after the path, `--` to end them. Its two departures from getopt, and why, are documented on `OptionParser`. The help text goes through the same module: `HelpPage` lays it out the way ArgumentParser did and wraps it to the window, or to `COLUMNS`, or to 80 columns in a pipe. The module knows nothing about realdate, so it can move into a package of its own once a second tool uses it.
 
 An option lives in five places, and a new one goes into all of them:
 
 1. `optionParser`, where it is declared
 2. `invocation(from:)`, where it becomes a property of the command
-3. `help` and `usage`, both written by hand
+3. `helpPage`, with its description; `synopsis`, the usage line, if the option belongs there
 4. `makeRealDate(…)`, with its default
 5. the `## Options` block in the README, copied from `realdate --help`
 
@@ -125,7 +125,7 @@ grep -rnE '(^|[ (\[{,=&|])![A-Za-z_(]' Sources Tests | grep -v '!='
 
 Two more by eye:
 
-- Does the change alter anything a user can see? Then bump `version`, and copy the `## Options` block in the README from the actual `realdate --help` output. Do not retype it. A hand-copied options block sat in the README for two months claiming the opposite of what the tool did.
+- Does the change alter anything a user can see? Then bump `version`, and copy the `## Options` block in the README from the actual `realdate --help | cat` output, which comes out at 80 columns. Do not retype it. A hand-copied options block sat in the README for two months claiming the opposite of what the tool did.
 - Does it change timestamp behavior? Then say which of the two rules above it follows, or why it needs a third.
 
 A rule nobody checks is decoration. That is why the commands are here and not just the rules.

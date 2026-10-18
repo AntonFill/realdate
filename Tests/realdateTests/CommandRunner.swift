@@ -75,7 +75,10 @@ extension CommandRunner {
     /// `LLVM_PROFILE_FILE` from it and writes into the same merge pool, which is how
     /// `RealDate.swift` gets counted for the run at all. The tests do not need it,
     /// the number does.
-    func run(_ arguments: [String]) throws -> Invocation {
+    ///
+    /// `environment` sets variables on top of that, and a `nil` value removes one, so a test
+    /// can state `COLUMNS` instead of inheriting whatever the developer's shell exports.
+    func run(_ arguments: [String], environment overrides: [String: String?] = [:]) throws -> Invocation {
         let outputURL = self.streamsDirectory.appendingPathComponent("stdout.log")
         let errorURL = self.streamsDirectory.appendingPathComponent("stderr.log")
         try FileManager.default.createDirectory(at: self.streamsDirectory, withIntermediateDirectories: true)
@@ -94,6 +97,9 @@ extension CommandRunner {
 
         var environment = ProcessInfo.processInfo.environment
         environment["TZ"] = "UTC"
+        for (name, value) in overrides {
+            environment[name] = value
+        }
         process.environment = environment
 
         try process.run()
