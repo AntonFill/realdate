@@ -37,6 +37,14 @@ struct ArgumentTests {
         #expect(invocation == .run(makeRealDate(path: "notes", format: ["dd-MM-yyyy", "yyyy"])))
     }
 
+    @Test("Reads the default time as a clock time")
+    func readsDefaultTime() throws {
+        let invocation = try RealDate.invocation(from: ["--default-time", "21:00", "notes"])
+
+        #expect(invocation == .run(makeRealDate(path: "notes", defaultTime: ClockTime(hour: 21, minute: 0))))
+        #expect(try RealDate.invocation(from: ["--default-time=9:05", "notes"]) == .run(makeRealDate(path: "notes", defaultTime: ClockTime(hour: 9, minute: 5))))
+    }
+
     @Test("A path that starts with a dash is reachable after a double dash")
     func pathAfterDoubleDash() throws {
         #expect(try RealDate.invocation(from: ["--", "-notes"]) == .run(makeRealDate(path: "-notes")))
@@ -69,6 +77,13 @@ struct ArgumentTests {
     func refusesEmptyFormat() throws {
         #expect(throws: RealDate.UsageError(description: "--format needs a date format, not an empty string.")) {
             try RealDate.invocation(from: ["--format", "yyyy", "--format", "", "notes"])
+        }
+    }
+
+    @Test("Refuses a default time that is not exactly a clock time", arguments: ["24:00", "21:60", "21:5", "9pm", "21:00:00", "+9:00", "21.00", ""])
+    func refusesInvalidDefaultTime(text: String) throws {
+        #expect(throws: RealDate.UsageError(description: "--default-time needs a time as HH:mm, not '\(text)'.")) {
+            try RealDate.invocation(from: ["--default-time=\(text)", "notes"])
         }
     }
 

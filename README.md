@@ -12,6 +12,7 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 
 - **Extract dates** from filename prefix (flexible format: `yyyy.MM.dd.HH.mm`, `yyyy.MM.dd`, `yyyy-MM-dd`, `yyyy_MM_dd`)
 - **Parse optional time** from the prefix (`2026.06.07.14.30` sets 14:30, a date without time means 00:00)
+- **Default time** for names that state only a day, with `--default-time 21:00`, so a weekly review named after its Sunday sorts after that Sunday's notes
 - **Set macOS timestamps** by one rule: a coarser statement never replaces a finer one. Midnight from a date-only name does not overwrite a real time on that same day, and the modification date is only lifted, never pulled back
 - **Clean filenames** by removing the date prefix
 - **Duplicate handling** with automatic counter (`Document.txt`, `Document 2.txt`, `Document 3.txt`)
@@ -65,6 +66,9 @@ realdate --format "dd.MM.yyyy" ~/Paperless
 # Process directories themselves as well, not just the files inside them
 realdate -r -d --rename ~/Paperless
 
+# Give names that state only a day an evening time instead of midnight
+realdate --default-time 21:00 ~/Notes/Reviews
+
 # Verbose output
 realdate -v -r .
 
@@ -81,7 +85,7 @@ realdate --help
 
 ### With Time
 - **Time format:** `2026.06.07.14.30 Email.eml` → `Email.eml` (time: 14:30)
-- Time is optional; if missing, defaults to 00:00
+- Time is optional; if missing, defaults to 00:00, or to the time given with `--default-time`
 
 Since v1.1.0 the filename is the single source of truth and timestamps are synchronised to the minute. Earlier versions compared the existing timestamp first and skipped a file whose date already matched, which left the time wrong.
 
@@ -98,9 +102,11 @@ Both timestamps follow one rule: **a coarser statement never replaces a finer on
 
 The creation date comes from the name, with one exception. A date-only format parses to midnight, and that midnight is a product of the format rather than a measurement, so it never replaces a real clock time the file already carries on that same day. `2026.08.12 Notes.md`, created at 12:15 on that very day, keeps its 12:15. A name that states a time of its own, such as `2026.08.12.09.30 Notes.md`, always wins, because it *is* a measurement. The rename happens either way, only the timestamp is spared.
 
-The modification date is only lifted when the name is *newer* than it, and left alone otherwise. The name says when a document is *from*, the modification date says when the file was last *edited*, and an edit that happened after the document's date is a fact worth keeping. Only when the name is newer would the file end up modified before it was created, and that inconsistency is corrected by lifting.
+The modification date is only lifted when the creation date the file ends up with is *newer* than it, and left alone otherwise. The name says when a document is *from*, the modification date says when the file was last *edited*, and an edit that happened after the document's date is a fact worth keeping. Only when the creation date is newer would the file end up modified before it was created, and that inconsistency is corrected by lifting the modification date to exactly the creation date. Lifting it only as far as the name, as up to v1.3.0, could undo a kept clock time, because APFS pulls a creation date down to an earlier modification date.
 
 Both behaviors arrived in v1.2.0. Before that, both dates were set from the name unconditionally.
+
+`--default-time` (since v1.4.0) follows the same rule. It fills the time a date-only name leaves open, and it never replaces a time the file already has on that day: a creation time on that day is kept as before, and an edit earlier on that day wins over the default, because the file demonstrably existed by then. A review named `2026.08.09 Weekly Review.md` and written four days later gets 21:00 on the 9th with `--default-time 21:00`, and its modification date from the 13th stays.
 
 ## Directories
 
@@ -122,7 +128,7 @@ Safe to use in a script: a failure is reported on stderr and answered with a non
 |---|---|
 | `0` | Everything the tool was asked to do succeeded. Items it deliberately skipped, such as symbolic links or names without a date, do not change this. |
 | `1` | At least one item could not be processed, for example an unreadable directory or a rename that was denied. A run over a tree still processes the remaining items and reports the failure at the end, like `chmod -R`. |
-| `64` | The command line itself was wrong: a missing path, an unknown option, or an empty `--format`. |
+| `64` | The command line itself was wrong: a missing path, an unknown option, an empty `--format`, or a `--default-time` that is not a time like `21:00`. |
 
 Failures go to **stderr**. Everything else, including the `-v` log of what was renamed and dated, goes to **stdout**, the way `cp -v` does. So `realdate -v -r … 2>/dev/null` shows the log and hides only the errors.
 
@@ -140,6 +146,9 @@ OPTIONS:
   --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
                           yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
                           yyyy.MM.dd)
+  --default-time <HH:mm>  Clock time for a name that states only a day,
+                          instead of midnight. A time the item already has on
+                          that day, from its creation or an edit, comes first.
   -r, --recursive         Search recursively in subdirectories.
   -v, --verbose           Show detailed information.
   --rename                Set timestamps, and rename files.

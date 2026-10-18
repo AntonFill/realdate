@@ -34,6 +34,7 @@ func createTestDirectory(_ fileID: String = #fileID) throws -> URL {
 func makeRealDate(
     path: String,
     format: [String] = RealDate.defaultFormats,
+    defaultTime: ClockTime? = nil,
     recursive: Bool = false,
     rename: Bool = false,
     verbose: Bool = false,
@@ -41,6 +42,7 @@ func makeRealDate(
 ) -> RealDate {
     RealDate(
         format: format,
+        defaultTime: defaultTime,
         recursive: recursive,
         verbose: verbose,
         rename: rename,

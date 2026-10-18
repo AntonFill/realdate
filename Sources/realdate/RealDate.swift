@@ -19,6 +19,8 @@ struct RealDate: Equatable {
 
     /// Date formats, tried in order.
     var format: [String] = RealDate.defaultFormats
+    /// The clock time a name that states only a day stands for; midnight without it.
+    var defaultTime: ClockTime? = nil
     var recursive = false
     var verbose = false
     var rename = false
@@ -84,6 +86,7 @@ extension RealDate {
 
     static let optionParser = OptionParser([
         .value("format"),
+        .value("default-time"),
         .flag("recursive", short: "r"),
         .flag("verbose", short: "v"),
         .flag("rename"),
@@ -128,8 +131,17 @@ extension RealDate {
             throw UsageError(description: "--format needs a date format, not an empty string.")
         }
 
+        var defaultTime: ClockTime?
+        if let text = parsed.value(of: "default-time") {
+            guard let time = ClockTime(text) else {
+                throw UsageError(description: "--default-time needs a time as HH:mm, not '\(text)'.")
+            }
+            defaultTime = time
+        }
+
         let command = RealDate(
             format: formats.isEmpty ? Self.defaultFormats : formats,
+            defaultTime: defaultTime,
             recursive: parsed.isSet("recursive"),
             verbose: parsed.isSet("verbose"),
             rename: parsed.isSet("rename"),
@@ -145,7 +157,7 @@ extension RealDate {
 
     /// What follows a usage error, the way `rm` and `cp` print theirs.
     static let usage = """
-        usage: realdate [--format <format> ...] [--recursive] [--verbose] [--rename] [--directories] <path>
+        usage: realdate [--format <format> ...] [--default-time <HH:mm>] [--recursive] [--verbose] [--rename] [--directories] <path>
         See 'realdate --help' for more information.
         """
 
@@ -155,7 +167,7 @@ extension RealDate {
         OVERVIEW: Extract date from filename prefix, set file timestamps, and remove
         date from filename.
 
-        USAGE: realdate [--format <format> ...] [--recursive] [--verbose] [--rename] [--directories] <path>
+        USAGE: realdate [--format <format> ...] [--default-time <HH:mm>] [--recursive] [--verbose] [--rename] [--directories] <path>
 
         ARGUMENTS:
           <path>                  Path to file(s) or directory.
@@ -164,6 +176,9 @@ extension RealDate {
           --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
                                   yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
                                   yyyy.MM.dd)
+          --default-time <HH:mm>  Clock time for a name that states only a day,
+                                  instead of midnight. A time the item already has on
+                                  that day, from its creation or an edit, comes first.
           -r, --recursive         Search recursively in subdirectories.
           -v, --verbose           Show detailed information.
           --rename                Set timestamps, and rename files.
@@ -317,7 +332,8 @@ extension RealDate {
             var attributes: [FileAttributeKey: Any] = [:]
 
             let keptTime = self.existingTimeToKeep(for: tuple, attributes: currentAttributes)
-            let creationDate = keptTime ?? tuple.date
+            let named = self.creationDate(for: tuple, attributes: currentAttributes)
+            let creationDate = keptTime ?? named.date
             if keptTime == nil {
                 attributes[.creationDate] = creationDate
             }
@@ -339,8 +355,11 @@ extension RealDate {
             if let keptTime {
                 dateString = "already on \(DateFormatter.mediumDateShortTime.string(from: keptTime)), time kept"
             }
+            else if named.isEditTime {
+                dateString = "set to \(DateFormatter.mediumDateShortTime.string(from: named.date)), the time of an edit that day"
+            }
             else {
-                dateString = "set to \(DateFormatter.mediumDateShortTime.string(from: tuple.date))"
+                dateString = "set to \(DateFormatter.mediumDateShortTime.string(from: named.date))"
             }
 
             guard self.rename else {
@@ -398,6 +417,31 @@ extension RealDate {
         return created
     }
 
+    /// The creation date a name stands for when no clock time on its day is kept.
+    ///
+    /// A name with a time states it, and that is final. A name with only a day parses to
+    /// midnight, unless `--default-time` supplies a clock time. That time fills a gap and never
+    /// replaces a measurement: an edit earlier on the same day wins over it, because the item
+    /// demonstrably existed by then. Otherwise the creation date would land after that edit,
+    /// and lifting the edit to meet it would overwrite a measured time with a guessed one.
+    /// `isEditTime` says which of the two the date is, for the verbose line.
+    func creationDate(for tuple: DateFilenameTuple, attributes: [FileAttributeKey: Any]) -> (date: Date, isEditTime: Bool) {
+        guard tuple.hasTime == false,
+              let defaultTime = self.defaultTime,
+              let defaulted = Date.currentCalendar.date(bySettingHour: defaultTime.hour, minute: defaultTime.minute, second: 0, of: tuple.date)
+        else {
+            return (tuple.date, false)
+        }
+
+        guard let modified = attributes[.modificationDate] as? Date,
+              modified.isSameDay(as: tuple.date),
+              modified < defaulted
+        else {
+            return (defaulted, false)
+        }
+        return (modified, true)
+    }
+
     func parseDateFromFilename(_ filename: String, dateFormatters: [DateFormatter]) -> DateFilenameTuple? {
         for formatter in dateFormatters {
             guard let date = formatter.date(fromFilename: filename) else {
@@ -444,6 +488,35 @@ extension RealDate {
             }
             counter += 1
         }
+    }
+}
+
+// MARK: - Clock time
+
+/// A time of day without a date, as `--default-time` gives it.
+struct ClockTime: Equatable {
+    let hour: Int
+    let minute: Int
+}
+
+extension ClockTime {
+
+    /// Reads `HH:mm` or `H:mm`, from 0:00 to 23:59, and nothing else: no seconds, no sign,
+    /// no `9pm`. A time that is almost right is a typo, not a time.
+    init?(_ text: String) {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              (1...2).contains(parts[0].count),
+              parts[1].count == 2,
+              parts.allSatisfy({ part in part.allSatisfy({ "0123456789".contains($0) }) }),
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]),
+              (0...23).contains(hour),
+              (0...59).contains(minute)
+        else {
+            return nil
+        }
+        self.init(hour: hour, minute: minute)
     }
 }
 

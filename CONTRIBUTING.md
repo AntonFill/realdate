@@ -32,7 +32,9 @@ This is the rule behind the timestamp behavior, and it is worth stating before y
 - The **creation date** comes from the name. But a date-only format parses to midnight, and that midnight is a product of the format rather than a measurement. If the file already carries a real clock time on that same day, the time stays.
 - The **modification date** is only ever lifted, never pulled back. An edit made after the date in the name is a fact, and the name does not know about it. Lifting happens only when the creation date the item ends up with is newer, and it goes to exactly that date: otherwise the file would be modified before it was created, and APFS settles that by pulling the creation date down to the modification date, which undoes a kept clock time.
 
-Both follow from the same idea: the name says when a document *is from*, the file system says what *happened to it*. Neither gets to overwrite the other with something vaguer.
+- **`--default-time`** fills the time a date-only name leaves open, and nothing more. A creation time already on that day is kept, as above, and an edit earlier on that day wins over the default: a clock time from a flag is coarser than one the file system measured.
+
+All three follow from the same idea: the name says when a document *is from*, the file system says what *happened to it*. Neither gets to overwrite the other with something vaguer.
 
 ## Conventions
 

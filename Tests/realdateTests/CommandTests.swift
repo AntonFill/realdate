@@ -123,6 +123,23 @@ struct CommandTests {
         #expect(try command.creationDate(of: "2026.03.05 Receipt.md") == makeUTCDate(2026, 3, 5))
     }
 
+    @Test("Gives a date-only name the clock time from --default-time")
+    func setsDefaultTimeFromCommandLine() throws {
+        let command = try CommandRunner()
+        defer {
+            command.removeWorkspace()
+        }
+        try command.makeFile(named: "2026.03.05 Receipt.md")
+
+        let run = try command.run(["--default-time", "21:00", "2026.03.05 Receipt.md"])
+
+        #expect(run.exitCode == 0)
+        #expect(run.standardOutput.isEmpty)
+        #expect(run.standardError.isEmpty)
+        // Written just now, the file has no time of its own on that day, so 21:00 fills the gap.
+        #expect(try command.creationDate(of: "2026.03.05 Receipt.md") == makeUTCDate(2026, 3, 5, hour: 21, minute: 0))
+    }
+
     // MARK: - Renaming
 
     @Test("Strips the date prefix with --rename, and keeps the contents")
