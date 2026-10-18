@@ -35,10 +35,11 @@ struct CommandFailureTests {
 
         let run = try command.run([])
 
-        // 64 is EX_USAGE, which ArgumentParser exits with on a usage error.
+        // 64 is EX_USAGE from sysexits(3), what rm and cp exit with on a usage error.
         #expect(run.exitCode == 64)
         #expect(run.standardOutput.isEmpty)
-        #expect(run.standardError.contains("Missing expected argument '<path>'"))
+        // The whole stream, so the shape is pinned too: the tool's own line, then the usage.
+        #expect(run.standardError == "realdate: missing path\n\(RealDate.usage)\n")
     }
 
     @Test("Rejects an unknown option instead of ignoring it")
@@ -52,7 +53,7 @@ struct CommandFailureTests {
         let run = try command.run(["--bogus", "2026.03.05 Receipt.md"])
 
         #expect(run.exitCode == 64)
-        #expect(run.standardError.contains("Unknown option '--bogus'"))
+        #expect(run.standardError.hasPrefix("realdate: unknown option '--bogus'\n"))
         // The run must not have half-processed the file before noticing.
         #expect(command.exists("2026.03.05 Receipt.md"))
     }

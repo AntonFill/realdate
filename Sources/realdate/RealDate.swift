@@ -6,59 +6,32 @@
 //
 
 import Foundation
-import ArgumentParser
+import CommandLineOptions
 
 @main
-struct RealDate: ParsableCommand {
+struct RealDate: Equatable {
     static let appname = "realdate"
-    static let abstract = "Extract date from filename prefix, set file timestamps, and remove date from filename."
-    static let version = "1.3.0"
+    static let version = "1.4.0"
 
-    static let configuration = CommandConfiguration(
-        commandName: Self.appname,
-        abstract: Self.abstract,
-        version: Self.version
-    )
+    /// The format with a time comes first: the date-only one also matches the start of a
+    /// name that carries a time, and the time would be lost.
+    static let defaultFormats = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"]
 
-    @Option(name: .long, help: "Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd, yyyy-MM-dd-HH-mm).")
-    var format: [String] = ["yyyy.MM.dd.HH.mm", "yyyy.MM.dd"] // Valid preset.
-
-    @Flag(name: .shortAndLong, help: "Search recursively in subdirectories.")
+    /// Date formats, tried in order.
+    var format: [String] = RealDate.defaultFormats
     var recursive = false
-
-    @Flag(name: .shortAndLong, help: "Show detailed information.")
     var verbose = false
-
-    @Flag(name: .long, help: "Set timestamps, and rename files.")
     var rename = false
-
-    @Flag(name: .shortAndLong, help: "Treat a directory itself as an item: set its timestamps, and rename it with --rename. Applies to the given directory, and to every visited subdirectory with -r.")
     var directories = false
-
-    @Argument(help: "Path to file(s) or directory.")
+    /// The file or directory to process.
     var path: String
 
     /// Whether anything failed along the way.
     ///
     /// A run over a tree does not stop at the first unreadable item, the same way
     /// `chmod -R` does not: the remaining items are still processed, and the failure
-    /// surfaces once at the end as a non-zero exit code. Not an option or a flag, so
-    /// ArgumentParser leaves it alone.
+    /// surfaces once at the end as a non-zero exit code.
     var hadFailure = false
-
-    /// Rejects a format that cannot describe a date.
-    ///
-    /// The empty format is the one that does damage, and it arrives by accident rather
-    /// than by intent: `--format "$FORMAT"` with an unset variable. A `DateFormatter`
-    /// with an empty format parses every name to its reference date, so a whole tree
-    /// gets dated to 2000-01-01 from a typo, and because nothing is trimmed off the
-    /// name, `--rename` leaves no visible trace either. This is the same rule as "no
-    /// date guessing", one step earlier: a format that matches everything is not a format.
-    func validate() throws {
-        guard self.format.allSatisfy({ $0.isEmpty == false }) else {
-            throw ValidationError("--format needs a date format, not an empty string.")
-        }
-    }
 
     mutating func run() throws {
         let dateFormatters = self.format.map { $0.customDateFormatter() }
@@ -75,7 +48,7 @@ struct RealDate: ParsableCommand {
 
         guard fileManager.fileExists(atPath: self.path, isDirectory: &isDir) else {
             printIf(true, "realdate: \(self.path): No such file or directory", to: .standardError)
-            throw ExitCode.failure
+            throw Failure()
         }
 
         if isDir.boolValue {
@@ -85,7 +58,152 @@ struct RealDate: ParsableCommand {
         }
 
         if self.hadFailure {
-            throw ExitCode.failure
+            throw Failure()
+        }
+    }
+}
+
+// MARK: - Command line
+extension RealDate {
+
+    /// What a command line asks for.
+    enum Invocation: Equatable {
+        case help
+        case version
+        case run(RealDate)
+    }
+
+    /// A command line the command refuses before anything ran. It ends in exit code 64.
+    struct UsageError: Error, Equatable, CustomStringConvertible {
+        let description: String
+    }
+
+    /// The run did not get everything done. What went wrong is already on standard error,
+    /// so this only carries the outcome to the exit code, which is 1.
+    struct Failure: Error {}
+
+    static let optionParser = OptionParser([
+        .value("format"),
+        .flag("recursive", short: "r"),
+        .flag("verbose", short: "v"),
+        .flag("rename"),
+        .flag("directories", short: "d"),
+        .flag("version"),
+        .flag("help", short: "h"),
+    ])
+
+    /// Reads the arguments after the command's name.
+    static func invocation(from arguments: [String]) throws -> Invocation {
+        let parsed: ParsedArguments
+        do {
+            parsed = try Self.optionParser.parse(arguments)
+        }
+        catch {
+            throw UsageError(description: "\(error)")
+        }
+
+        // Help and the version need nothing else on the line, not even a path.
+        if parsed.isSet("help") {
+            return .help
+        }
+        if parsed.isSet("version") {
+            return .version
+        }
+
+        guard let path = parsed.operands.first else {
+            throw UsageError(description: "missing path")
+        }
+        guard parsed.operands.count == 1 else {
+            throw UsageError(description: "unexpected argument '\(parsed.operands[1])'")
+        }
+
+        // The empty format is the one that does damage, and it arrives by accident rather
+        // than by intent: `--format "$FORMAT"` with an unset variable. A `DateFormatter`
+        // with an empty format parses every name to its reference date, so a whole tree
+        // gets dated to 2000-01-01 from a typo, and because nothing is trimmed off the
+        // name, `--rename` leaves no visible trace either. This is the same rule as "no
+        // date guessing", one step earlier: a format that matches everything is not a format.
+        let formats = parsed.values(of: "format")
+        guard formats.allSatisfy({ $0.isEmpty == false }) else {
+            throw UsageError(description: "--format needs a date format, not an empty string.")
+        }
+
+        let command = RealDate(
+            format: formats.isEmpty ? Self.defaultFormats : formats,
+            recursive: parsed.isSet("recursive"),
+            verbose: parsed.isSet("verbose"),
+            rename: parsed.isSet("rename"),
+            directories: parsed.isSet("directories"),
+            path: path
+        )
+        return .run(command)
+    }
+}
+
+// MARK: - Help
+extension RealDate {
+
+    /// What follows a usage error, the way `rm` and `cp` print theirs.
+    static let usage = """
+        usage: realdate [--format <format> ...] [--recursive] [--verbose] [--rename] [--directories] <path>
+        See 'realdate --help' for more information.
+        """
+
+    /// Written by hand in the layout ArgumentParser generated up to 1.3.0. The `## Options`
+    /// block in the README is a copy of what this prints.
+    static let help = """
+        OVERVIEW: Extract date from filename prefix, set file timestamps, and remove
+        date from filename.
+
+        USAGE: realdate [--format <format> ...] [--recursive] [--verbose] [--rename] [--directories] <path>
+
+        ARGUMENTS:
+          <path>                  Path to file(s) or directory.
+
+        OPTIONS:
+          --format <format>       Date custom format (e.g. dd-MM-yyyy, yyyy-MM-dd,
+                                  yyyy-MM-dd-HH-mm). (default: yyyy.MM.dd.HH.mm,
+                                  yyyy.MM.dd)
+          -r, --recursive         Search recursively in subdirectories.
+          -v, --verbose           Show detailed information.
+          --rename                Set timestamps, and rename files.
+          -d, --directories       Treat a directory itself as an item: set its
+                                  timestamps, and rename it with --rename. Applies to
+                                  the given directory, and to every visited
+                                  subdirectory with -r.
+          --version               Show the version.
+          -h, --help              Show help information.
+
+        """
+}
+
+// MARK: - Entry point
+extension RealDate {
+
+    static func main() {
+        let invocation: Invocation
+        do {
+            invocation = try Self.invocation(from: Array(CommandLine.arguments.dropFirst()))
+        }
+        catch {
+            // EX_USAGE, the code `rm` and `cp` exit with on a command line they cannot use.
+            printIf(true, "realdate: \(error)", to: .standardError)
+            printIf(true, Self.usage, to: .standardError)
+            exit(EX_USAGE)
+        }
+
+        switch invocation {
+        case .help:
+            print(Self.help)
+        case .version:
+            print(Self.version)
+        case .run(var command):
+            do {
+                try command.run()
+            }
+            catch {
+                exit(EXIT_FAILURE)
+            }
         }
     }
 }

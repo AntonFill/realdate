@@ -45,11 +45,23 @@ These are not negotiable, and they apply to sources and tests alike.
 - **Group code with `// MARK: -`** and extensions, rather than one large type body.
 - **Bump `static let version`** in `RealDate.swift` with every user-visible change. Commit `883e0ed` exists solely because that was forgotten once.
 
+### The command line
+
+realdate reads its arguments with `CommandLineOptions`, a module in this package rather than a dependency. It follows getopt: grouped short flags, a value attached or as the next argument, options after the path, `--` to end them. Its two departures from getopt, and why, are documented on `OptionParser`. The module knows nothing about realdate, so it can move into a package of its own once a second tool uses it.
+
+An option lives in five places, and a new one goes into all of them:
+
+1. `optionParser`, where it is declared
+2. `invocation(from:)`, where it becomes a property of the command
+3. `help` and `usage`, both written by hand
+4. `makeRealDate(…)`, with its default
+5. the `## Options` block in the README, copied from `realdate --help`
+
 ### Tests
 
 - **Swift Testing** (`import Testing`, `@Suite`, `@Test`, `#expect`, `#require`), not XCTest.
 - **One test file per concern**, named after it: `SymlinkTests`, `DirectoryTests`, `CreationTimeTests`. New behavior is proven by a test, and the test names state the rule rather than the mechanics.
-- **Build the command with `makeRealDate(…)`** from `TestingHelpers.swift`, never by assigning properties by hand. ArgumentParser traps at runtime on a `@Flag` that was neither parsed nor assigned, so a single new flag otherwise crashes every test at once. **Adding a flag means adding it to that helper, with its default.**
+- **Build the command with `makeRealDate(…)`** from `TestingHelpers.swift`, never by assigning properties by hand. The helper carries the command line's defaults, so a test names only what it changes. **Adding an option means adding it to that helper, with its default.**
 - **Every test that touches the file system gets its own directory** from `createTestDirectory()`, which keys on `#fileID` plus a UUID. Suites run in parallel; a shared path means a regressed tool walks through another test's files.
 - Prove a behavior by disabling it. If the suite still passes with the code removed, the test was measuring something else.
 
@@ -57,7 +69,7 @@ These are not negotiable, and they apply to sources and tests alike.
 
 Most suites run **in process**: they build the command with `makeRealDate(…)` and call `run()` on it. That is where a behavior gets covered thoroughly, because a test there costs nothing.
 
-`CommandTests.swift` and `CommandFailureTests.swift` are the level above. Every test in them launches the **built binary** as a subprocess through `CommandRunner`, so what it measures is the command a user types: argument parsing, the exit code, the split between stdout and stderr, and what the run left on disk. None of that is reachable in process, because `run()` neither parses arguments nor exits.
+`CommandTests.swift` and `CommandFailureTests.swift` are the level above. Every test in them launches the **built binary** as a subprocess through `CommandRunner`, so what it measures is the command a user types: the exit code, the split between stdout and stderr, and what the run left on disk. None of that is reachable in process, because `run()` does not exit. How a command line is read is: `RealDate.invocation(from:)` is a plain function, and `ArgumentTests` covers it.
 
 The two files split by outcome, because that is what a user sees: `CommandTests` holds what the command does, `CommandFailureTests` what it refuses (exit 64, nothing ran) and what it cannot do (exit 1, work started and failed).
 
@@ -87,7 +99,7 @@ Unix means the stream and the exit code too, not just the shape of the line. Unt
 - **Diagnostics stay on stdout, unlike in the sibling mail2md**, which puts everything on stderr. This tool produces no data on stdout, so `-v` output can live there the way `cp -v` and `mv -v` do, and `2>/dev/null` then silences errors only.
 - **A tree run does not stop at the first failure.** It sets `self.hadFailure` and carries on, and `run()` throws `ExitCode.failure` at the end, the way `chmod -R` behaves. That is why `processDirectory`, `processFile` and `applyDate` are `mutating`.
 - **Never let Foundation's own error text be the whole message.** It names the item in typographic quotes, it is localized, and it carries no path in this tool's shape. Write the tool's line unconditionally and put `error.localizedDescription` behind `-v`.
-- **Reject bad input in `validate()`**, not inside `run()`. ArgumentParser then produces the usage error itself: stderr, exit 64, and the usage block. `--format ""` is the case that exists, and it earned the rule.
+- **Reject bad input in `invocation(from:)`**, not inside `run()`, by throwing a `UsageError`. It ends as a usage error before anything ran: the tool's line and the usage on stderr, exit 64. `--format ""` is the case that exists, and it earned the rule.
 
 ## Layout and style
 

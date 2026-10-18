@@ -8,16 +8,25 @@ let package = Package(
     platforms: [
         .macOS(.v13)
     ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.0")
-    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
+
+        // Reads the command line the way getopt does. A module of its own, so it cannot reach
+        // into realdate's code and can move into a package once a second tool uses it.
+        .target(
+            name: "CommandLineOptions"
+        ),
         .executableTarget(
             name: "realdate",
             dependencies: [
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                "CommandLineOptions"
+            ]
+        ),
+        .testTarget(
+            name: "CommandLineOptionsTests",
+            dependencies: [
+                "CommandLineOptions"
             ]
         ),
         .testTarget(
