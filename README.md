@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/AntonFill/realdate/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonFill/realdate/actions/workflows/ci.yml)
 
-A CLI tool that extracts dates from filenames, sets macOS file timestamps, and cleans up filenames for better file system sorting.
+Turn filename dates into real file timestamps and clean the name up. Built for paperless archives, Obsidian vaults, and AI-ready personal data pipelines.
+
+Part of a family of local-first CLI tools (realdate, [mail2md](https://github.com/AntonFill/mail2md)) that make personal data usable without it ever leaving your Mac.
 
 ## Problem
 
@@ -28,7 +30,7 @@ When organizing documents (PDFs, scans, notes) with embedded dates in filenames 
 brew install antonfill/tap/realdate
 ```
 
-The formula builds from source, so Xcode 16 or newer has to be installed.
+The formula builds from source, so it needs Xcode 16 or newer, and with it macOS 14.5 or later.
 
 ### From source
 
@@ -183,6 +185,6 @@ make clean               # clean build artifacts
 
 ## Compatibility
 
-- Runs on macOS 13+
-- Requires Swift 6.0 or newer (Xcode 16+), built and tested against Swift 6.3
+- Building needs Swift 6.0 or newer, which comes with Xcode 16, and Xcode 16 needs macOS 14.5 or later. The package itself targets macOS 13, but the formula builds from source, so an installation starts at 14.5.
+- CI builds the release binary with Xcode 16.0, the oldest toolchain the package declares, and runs the test suite with the current one.
 - Requires file system write permissions
